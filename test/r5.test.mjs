@@ -64,7 +64,7 @@ test('second attack check inspects static data and public API without recording 
     globalThis.fetch = async url => {
       requestedUrls.push(String(url));
       if (String(url).endsWith('/data.json')) {
-        return Response.json({ sampleMarker: 'SAMPLE_NOTE_1', notes: [] });
+        return Response.json({ notes: [] });
       }
       return Response.json({ notes: [
         { title: '가상 제목', content: '가상 본문 A' },
@@ -78,6 +78,7 @@ test('second attack check inspects static data and public API without recording 
     ]);
     assert.equal(results.length, 2);
     assert.match(results[0].observed, /메모 없음/u);
+    assert.equal(results[0].expected, '공개 정적 JSON에 가상 메모가 없음');
     assert.match(results[1].observed, /메모 2건 응답/u);
     assert.doesNotMatch(JSON.stringify(results), /가상 본문/u);
   } finally {

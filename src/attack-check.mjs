@@ -20,7 +20,10 @@ export async function runAttackChecks(config) {
   if (response.ok) {
     try {
       const data = await response.json();
-      if (data?.sampleMarker === config.sampleMarker && Array.isArray(data.notes)) {
+      const validData = config.step === 1
+        ? data?.sampleMarker === config.sampleMarker
+        : data?.sampleMarker === undefined;
+      if (validData && Array.isArray(data.notes)) {
         staticNoteCount = data.notes.length;
       }
     } catch {
