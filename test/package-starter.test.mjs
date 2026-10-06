@@ -12,7 +12,7 @@ test('패키징 함수 기준표는 시작 틀의 실제 API와 일치한다', a
   assert.equal(baseline.version, 1);
   assert.equal(baseline.starter, 'ChoiTimo/aleph-defense-starter');
   assert.deepEqual(baseline.functions, []);
-  assert.deepEqual(baseline.allowedNew, ['api/ai.js', 'api/threat-intel.js']);
+  assert.deepEqual(baseline.allowedNew, ['api/ai.js', 'api/notes.js', 'api/threat-intel.js']);
   assert.deepEqual(actual, [...baseline.functions, ...baseline.allowedNew].sort());
 });
 
@@ -29,6 +29,66 @@ test('미구현 서버 뼈대는 성공이나 로그인 통과로 가장하지 �
     assert.equal(status, 501);
     assert.equal(headers.get('cache-control'), 'no-store');
     assert.match(body.error, /NOT_IMPLEMENTED$/u);
+  }
+});
+
+test('메모 API는 서버 환경 변수가 없으면 값을 노출하지 않는다', async () => {
+  const { default: handler } = await import('../api/notes.js');
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SECRET_KEY;
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_SECRET_KEY;
+  let status;
+  let body;
+  try {
+    await handler({ method: 'GET' }, {
+      setHeader: () => {},
+      status: value => { status = value; return { json: value => { body = value; } }; },
+    });
+    assert.equal(status, 503);
+    assert.deepEqual(body, { error: 'NOTES_UNAVAILABLE' });
+  } finally {
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env.SUPABASE_SECRET_KEY;
+    else process.env.SUPABASE_SECRET_KEY = originalKey;
+  }
+});
+
+test('메모 API는 서버에서 조회하고 secret key를 응답에 넣지 않는다', async () => {
+  const { default: handler } = await import('../api/notes.js');
+  const originalUrl = process.env.SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SECRET_KEY;
+  const originalFetch = globalThis.fetch;
+  const secretKey = 'test-only-fake-secret-value';
+  const notes = [{ id: 'note-1', title: '과제', content: '가상 기록' }];
+  let requestedUrl;
+  let sentKey;
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  process.env.SUPABASE_SECRET_KEY = secretKey;
+  globalThis.fetch = async (url, options) => {
+    requestedUrl = String(url);
+    sentKey = new Headers(options?.headers).get('apikey');
+    return Response.json(notes);
+  };
+  let status;
+  let body;
+  try {
+    await handler({ method: 'GET' }, {
+      setHeader: () => {},
+      status: value => { status = value; return { json: value => { body = value; } }; },
+    });
+    assert.equal(status, 200);
+    assert.match(requestedUrl, /\/rest\/v1\/vault_notes\?/u);
+    assert.equal(sentKey, secretKey);
+    assert.deepEqual(body, { notes });
+    assert.equal(JSON.stringify(body).includes(secretKey), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.SUPABASE_URL;
+    else process.env.SUPABASE_URL = originalUrl;
+    if (originalKey === undefined) delete process.env.SUPABASE_SECRET_KEY;
+    else process.env.SUPABASE_SECRET_KEY = originalKey;
   }
 });
 
