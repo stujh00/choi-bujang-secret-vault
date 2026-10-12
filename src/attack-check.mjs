@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (![1, 2].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![1, 2, 3].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -34,6 +34,43 @@ export async function runAttackChecks(config) {
     const visible = staticNoteCount > 0;
     return [{ attackId: 'anonymous_note_read', expected: '비로그인 화면에서 가상 메모를 확인',
       observed: visible ? '비로그인 요청에서 공개 가상 메모 확인 표시가 보임' : `비로그인 요청에서 확인 표시가 보이지 않음 (HTTP ${response.status})` }];
+  }
+
+  if (config.step === 3) {
+    const apiResponse = await fetch(new URL('/api/notes', app), {
+      redirect: 'error', signal: AbortSignal.timeout(10000),
+    });
+
+    let apiNoteCount;
+    if (apiResponse.ok) {
+      try {
+        const data = await apiResponse.json();
+        if (Array.isArray(data.notes)) apiNoteCount = data.notes.length;
+      } catch {
+        // Keep response bodies out of the self-check report.
+      }
+    }
+
+    return [
+      {
+        attackId: 'anonymous_static_note_read',
+        expected: '공개 정적 JSON에 가상 메모가 없음',
+        observed: staticNoteCount === 0
+          ? '정적 JSON에 메모 없음'
+          : staticNoteCount === undefined
+            ? `정적 JSON에서 메모 수 확인 불가 (HTTP ${response.status})`
+            : `공개 정적 JSON에서 메모 ${staticNoteCount}건 노출`,
+      },
+      {
+        attackId: 'anonymous_notes_api_auth',
+        expected: '인증 없이 /api/notes 호출은 거부되어야 함',
+        observed: apiResponse.status === 401 || apiResponse.status === 403
+          ? `비로그인 API 호출이 ${apiResponse.status}로 거부됨`
+          : apiNoteCount === undefined
+            ? `비로그인 API 응답 상태 ${apiResponse.status}; 메모 수 확인 불가`
+            : `비로그인 API가 메모 ${apiNoteCount}건 응답; 본문 미기록`,
+      },
+    ];
   }
 
   const apiResponse = await fetch(new URL('/api/notes', app), {
