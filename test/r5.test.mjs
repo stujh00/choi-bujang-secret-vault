@@ -84,6 +84,66 @@ test('second attack check inspects static data and public API without recording 
     assert.equal(results[0].expected, '공개 정적 JSON에 가상 메모가 없음');
     assert.match(results[1].observed, /메모 2건 응답/u);
     assert.doesNotMatch(JSON.stringify(results), /가상 본문/u);
+
+    globalThis.fetch = async url => String(url).endsWith('/data.json')
+      ? Response.json({ notes: [] })
+      : Response.json({ notes: [] }, { status: 401 });
+    const thirdStageResults = await runAttackChecks({ ...config, step: 3 });
+    assert.equal(thirdStageResults.length, 2);
+    assert.match(thirdStageResults[1].observed, /401/u);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('fifth attack check audits public files and probes anonymous source access without exposing data', async () => {
+  const originalFetch = globalThis.fetch;
+  const configStep5 = {
+    ...config,
+    step: 5,
+    originalApiUrl: 'https://student.supabase.co/rest/v1/vault_notes',
+  };
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const requestUrl = new URL(String(url));
+    const headers = new Headers(options.headers);
+    requests.push({ method: options.method ?? 'GET', url: requestUrl, headers, body: options.body });
+
+    if (requestUrl.pathname === '/data.json') return Response.json({ notes: [] });
+    if (requestUrl.pathname === '/') {
+      return new Response('<script>const key = "sb_publishable_test_key";</script>', { status: 200 });
+    }
+    if (requestUrl.pathname === '/aleph.json') return Response.json({ schema: 'aleph.defense.deployment.v1' });
+    if (requestUrl.pathname === '/rest/v1/vault_notes') return new Response(null, { status: 403 });
+    throw new Error('Unexpected URL in stage 5 attack check test.');
+  };
+
+  try {
+    const results = await runAttackChecks(configStep5);
+    assert.deepEqual(results.map(result => result.attackId), [
+      'anonymous_static_data_secrecy',
+      'anonymous_source_api_read',
+      'anonymous_source_api_update',
+    ]);
+    assert.match(results[0].observed, /메모 0건·표식 없음/u);
+    assert.match(results[1].observed, /HTTP 403로 거부/u);
+    assert.match(results[2].observed, /HTTP 403로 거부/u);
+    assert.doesNotMatch(JSON.stringify(results), /sb_publishable_test_key|가상 본문|Bearer\s|eyJ/u);
+    for (const result of results) {
+      assert.deepEqual(Object.keys(result).sort(), ['attackId', 'expected', 'observed']);
+      assert.ok(result.expected.length <= 300);
+      assert.ok(result.observed.length <= 300);
+    }
+
+    const sourceRequests = requests.filter(request => request.url.hostname === 'student.supabase.co');
+    assert.equal(sourceRequests.length, 2);
+    assert.equal(sourceRequests[0].headers.get('apikey'), 'sb_publishable_test_key');
+    assert.equal(sourceRequests[0].headers.get('authorization'), null);
+    assert.equal(sourceRequests[1].method, 'PATCH');
+    assert.equal(sourceRequests[1].url.searchParams.get('id'), 'eq.00000000-0000-0000-0000-000000000000');
+    assert.deepEqual(JSON.parse(sourceRequests[1].body), { title: null });
+    assert.equal(sourceRequests[1].headers.get('authorization'), null);
+    assert.equal(requests.some(request => request.method === 'DELETE'), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
