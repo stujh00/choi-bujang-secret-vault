@@ -125,7 +125,7 @@ test('fifth attack check audits public files and probes anonymous source access 
       'anonymous_source_api_read',
       'anonymous_source_api_update',
     ]);
-    assert.match(results[0].observed, /메모 0건·표식 없음/u);
+    assert.match(results[0].observed, /비밀값 패턴 있음/u);
     assert.match(results[1].observed, /HTTP 403로 거부/u);
     assert.match(results[2].observed, /HTTP 403로 거부/u);
     assert.doesNotMatch(JSON.stringify(results), /sb_publishable_test_key|가상 본문|Bearer\s|eyJ/u);

@@ -1,6 +1,6 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
-const PRIVATE_VALUE_PATTERN = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bsb_secret_[A-Za-z0-9_-]{12,}\b|\bSUPABASE_SECRET_KEY\s*[:=]\s*["'][^"']+["']|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}/iu;
+const PRIVATE_VALUE_PATTERN = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bsb_(?:secret|publishable)_[A-Za-z0-9_-]{8,}\b|\bSUPABASE_SECRET_KEY\s*[:=]\s*["'][^"']+["']|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}/iu;
 
 async function fetchText(url, options = {}) {
   const response = await fetch(url, {

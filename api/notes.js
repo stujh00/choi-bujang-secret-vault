@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { readSessionCookie, requestOriginAllowed } from '../src/auth-session.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 
 function readConfig() {
@@ -35,7 +36,15 @@ export default async function handler(request, response) {
     return response.status(503).json({ notes: [], error: 'NOTES_UNAVAILABLE' });
   }
 
-  const authorization = request.headers?.authorization;
+  let authorization = request.headers?.authorization;
+  if (typeof authorization !== 'string' || !/^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(authorization)) {
+    const session = readSessionCookie(request, secretKey);
+    if (session && ['POST', 'PUT', 'DELETE'].includes(request.method)
+        && !requestOriginAllowed(request)) {
+      return response.status(403).json({ notes: [], error: 'ORIGIN_NOT_ALLOWED' });
+    }
+    if (session) authorization = `Bearer ${session.access_token}`;
+  }
   const verifier = createLoginVerifier({ config, supabaseSecretKey: secretKey });
   const login = await verifier(authorization);
   if (!login || login.kind !== 'student') {

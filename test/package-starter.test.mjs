@@ -3,6 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { writeSessionCookie } from '../src/auth-session.mjs';
 
 const baseline = JSON.parse(await readFile(new URL('../package/baseline-functions.json', import.meta.url)));
 
@@ -168,14 +169,17 @@ test('메모 API는 목록과 모든 단건 작업을 소유자에게만 허용�
     throw new Error(`Unexpected method in ownership test: ${options.method}`);
   };
 
-  const invoke = async (handler, method, userToken, path, body) => {
+  const invoke = async (handler, method, userToken, path, body, cookieAuth = false, origin = 'https://student-defense.vercel.app') => {
     let status;
     let responseBody;
+    const headers = cookieAuth
+      ? { cookie: sessionCookie(userToken), host: 'student-defense.vercel.app', origin }
+      : { authorization: `Bearer ${userToken}` };
     await handler({
       method,
       url: path,
       query: { id: path.split('/').at(-1) },
-      headers: { authorization: `Bearer ${userToken}` },
+      headers,
       body,
     }, {
       setHeader: () => {},
@@ -184,11 +188,34 @@ test('메모 API는 목록과 모든 단건 작업을 소유자에게만 허용�
     return { status, body: responseBody };
   };
 
+  function sessionCookie(token) {
+    let cookie;
+    writeSessionCookie({ setHeader: (_name, value) => { cookie = value.split(';', 1)[0]; } }, {
+      access_token: token,
+      refresh_token: 'test-only-refresh-token',
+    }, process.env.SUPABASE_SECRET_KEY);
+    return cookie;
+  }
+
   try {
     const listA = await invoke(notesHandler, 'GET', tokenA, '/api/notes');
     const listB = await invoke(notesHandler, 'GET', tokenB, '/api/notes');
     assert.deepEqual(listA.body, [{ id: noteAId, title: 'A title', body: 'A private body' }]);
     assert.deepEqual(listB.body, [{ id: noteBId, title: 'B title', body: 'B private body' }]);
+
+    const cookieListA = await invoke(notesHandler, 'GET', tokenA, '/api/notes', undefined, true);
+    assert.deepEqual(cookieListA.body, listA.body);
+    const cookieReadA = await invoke(noteHandler, 'GET', tokenA, `/api/notes/${noteAId}`, undefined, true);
+    assert.equal(cookieReadA.status, 200);
+    assert.deepEqual(cookieReadA.body, { id: noteAId, title: 'A title', body: 'A private body' });
+    const cookieCrossOriginUpdate = await invoke(noteHandler, 'PUT', tokenA, `/api/notes/${noteAId}`, {
+      title: 'Must not change', body: 'Cross-origin request',
+    }, true, 'https://attacker.example');
+    assert.equal(cookieCrossOriginUpdate.status, 403);
+    const csrfRejected = await invoke(notesHandler, 'POST', tokenA, '/api/notes', {
+      title: 'Must not be created', body: 'Cross-origin request',
+    }, true, 'https://attacker.example');
+    assert.equal(csrfRejected.status, 403);
 
     const created = await invoke(notesHandler, 'POST', tokenA, '/api/notes', {
       owner_id: ownerB,
@@ -205,20 +232,25 @@ test('메모 API는 목록과 모든 단건 작업을 소유자에게만 허용�
     ];
     for (const handler of [noteHandler, notesHandler]) {
       for (const accessCase of crossAccessCases) {
-        const otherRead = await invoke(handler, 'GET', accessCase.token, `/api/notes/${accessCase.noteId}`);
-        assert.equal(otherRead.status, 404);
-        assert.equal(JSON.stringify(otherRead.body).includes(accessCase.body), false);
+        for (const cookieAuth of [false, true]) {
+          const otherRead = await invoke(handler, 'GET', accessCase.token,
+            `/api/notes/${accessCase.noteId}`, undefined, cookieAuth);
+          assert.equal(otherRead.status, 404);
+          assert.equal(JSON.stringify(otherRead.body).includes(accessCase.body), false);
 
-        const otherUpdate = await invoke(handler, 'PUT', accessCase.token, `/api/notes/${accessCase.noteId}`, {
-          title: 'Changed by another account', body: 'Cross-account update must not be applied',
-        });
-        assert.equal(otherUpdate.status, 404);
-        assert.equal(records.get(accessCase.noteId).title, accessCase.title);
-        assert.equal(records.get(accessCase.noteId).owner_id, accessCase.ownerId);
+          const otherUpdate = await invoke(handler, 'PUT', accessCase.token,
+            `/api/notes/${accessCase.noteId}`, {
+              title: 'Changed by another account', body: 'Cross-account update must not be applied',
+            }, cookieAuth);
+          assert.equal(otherUpdate.status, 404);
+          assert.equal(records.get(accessCase.noteId).title, accessCase.title);
+          assert.equal(records.get(accessCase.noteId).owner_id, accessCase.ownerId);
 
-        const otherDelete = await invoke(handler, 'DELETE', accessCase.token, `/api/notes/${accessCase.noteId}`);
-        assert.equal(otherDelete.status, 404);
-        assert.equal(records.get(accessCase.noteId).owner_id, accessCase.ownerId);
+          const otherDelete = await invoke(handler, 'DELETE', accessCase.token,
+            `/api/notes/${accessCase.noteId}`, undefined, cookieAuth);
+          assert.equal(otherDelete.status, 404);
+          assert.equal(records.get(accessCase.noteId).owner_id, accessCase.ownerId);
+        }
       }
     }
 

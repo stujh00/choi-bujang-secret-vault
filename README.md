@@ -46,7 +46,9 @@ GitHub에서는 저장소의 현재 기본 브랜치에서 위 문장을 각각 
 
 ### 5단계: 자료 요청을 서버 한곳으로 모으기
 
-브라우저는 Supabase Auth로 로그인·로그아웃하고 JWT를 받지만, 메모 조회·추가·수정·삭제는 Vercel의 `/api/notes`와 `/api/notes/:id`만 호출합니다. 서버는 JWT를 검증하고 각 요청에서 확인한 사용자 ID와 `owner_id`를 비교합니다. 브라우저는 Supabase Data API를 직접 호출하지 않습니다.
+브라우저는 `/api/auth/login`, `/api/auth/logout`, `/api/auth/session` 서버 함수로 로그인·로그아웃·세션 확인을 요청합니다. 서버에서 Supabase Auth SDK를 사용하며 access/refresh token은 서명된 HttpOnly·Secure·SameSite 쿠키로만 전달합니다. 브라우저 JavaScript는 Supabase SDK, 공개 키, JWT를 사용하지 않습니다. 메모 조회·추가·수정·삭제는 Vercel의 `/api/notes`와 `/api/notes/:id`만 호출합니다. 쿠키 인증과 기존 외부 Bearer JWT 인증은 같은 JWT 검증기를 거치고, 서버는 확인한 사용자 ID와 `owner_id`를 비교합니다.
+
+Vercel 프로젝트의 **Settings > Environment Variables**에 기존 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`와 함께 서버 전용 `SUPABASE_PUBLISHABLE_KEY`를 설정합니다. 이 변수는 브라우저용 공개 설정으로 주입하지 않습니다. 인증 상태 변경 요청은 같은 출처 `Origin`만 허용하며 인증 응답은 저장되지 않습니다.
 
 `aleph.config.json`의 `originalApiUrl`은 원본 Supabase REST 경로를 가리키며, `allowedRoutes`는 현재 메모 API 다섯 경로를 기록합니다. `supabase/step5-revoke-client-table-access.sql`은 `vault_notes`에서 `PUBLIC`, `anon`, `authenticated`의 테이블 권한을 회수합니다. 확인된 결과에서는 anon과 authenticated의 SELECT·INSERT·UPDATE·DELETE가 모두 `false`입니다.
 
@@ -56,9 +58,10 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 
 다시 실행하는 방법:
 1. 로컬에서 정적 빌드: `npm run build -- --local`
-2. 실제 API 확인: `npx vercel dev --listen 127.0.0.1:3000`
-3. 브라우저에서 `http://127.0.0.1:3000` 접속
-4. Supabase Auth로 로그인하고 메모를 생성·수정·삭제합니다.
+2. 자동 시험: `npm run test`
+3. 실제 API 확인: `npx vercel dev --listen 127.0.0.1:3000`
+4. 브라우저에서 `http://127.0.0.1:3000` 접속
+5. 로그인 후 메모를 생성·수정·삭제하고 로그아웃을 확인합니다.
 
 ## 시작 틀의 자동 처리
 

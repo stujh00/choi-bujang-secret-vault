@@ -45,7 +45,7 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 2단계 자료 보호</div>
+    <div class="eyebrow">BYTE BACK · 5단계 인증 보호</div>
     <h1>자료실</h1>
 
     <section class="auth-panel" aria-live="polite">
@@ -91,20 +91,6 @@
     </section>
   </main>
   <script type="module">
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
-
-    const supabase = createClient(
-      'https://fkaqjesnvkqxrftaqmxe.supabase.co',
-      'sb_publishable_Z_6V9xS4LNc725lAGwPE-A_5NoTdFx7',
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true
-        }
-      }
-    );
-
     const list = document.querySelector('#notes');
     const notePanel = document.querySelector('#notePanel');
     const noteForm = document.querySelector('#noteForm');
@@ -143,9 +129,12 @@
       setNoteFormMode(false);
     }
 
-    async function getAuthHeaders() {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+    function apiFetch(path, options = {}) {
+      return fetch(path, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        ...options,
+      });
     }
 
     async function parseJsonResponse(response) {
@@ -162,12 +151,8 @@
     }
 
     async function loadNotes() {
-      const headers = await getAuthHeaders();
       try {
-        const response = await fetch('/api/notes', {
-          cache: 'no-store',
-          headers,
-        });
+        const response = await apiFetch('/api/notes');
         if (!response.ok) throw new Error('자료를 불러올 수 없습니다.');
         const data = await parseJsonResponse(response);
         const notes = Array.isArray(data) ? data : (Array.isArray(data.notes) ? data.notes : []);
@@ -200,11 +185,9 @@
             deleteButton.addEventListener('click', async () => {
               const confirmDelete = window.confirm('이 메모를 삭제할까요?');
               if (!confirmDelete) return;
-              const deleteHeaders = await getAuthHeaders();
-              const response = await fetch(`/api/notes/${note.id}`, {
+              const response = await apiFetch(`/api/notes/${note.id}`, {
                 method: 'DELETE',
                 headers: {
-                  ...deleteHeaders,
                   'Content-Type': 'application/json',
                 },
               });
@@ -256,17 +239,15 @@
         return;
       }
 
-      const headers = await getAuthHeaders();
       const noteId = noteIdInput.value;
       const method = noteId ? 'PUT' : 'POST';
       const url = noteId ? `/api/notes/${noteId}` : '/api/notes';
       const payload = { id: noteId || undefined, title, body };
 
       try {
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
           method,
           headers: {
-            ...headers,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
@@ -304,9 +285,14 @@
 
       loginButton.disabled = true;
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        updateAuthUI(data.session);
+        const response = await apiFetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await parseJsonResponse(response);
+        if (!response.ok) throw new Error(data?.message || '로그인에 실패했습니다.');
+        updateAuthUI(data);
         await loadNotes();
         loginForm.reset();
       } catch (error) {
@@ -320,8 +306,8 @@
       setAuthError('');
       logoutButton.disabled = true;
       try {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
+        const response = await apiFetch('/api/auth/logout', { method: 'POST' });
+        if (!response.ok) throw new Error('로그아웃에 실패했습니다.');
         updateAuthUI(null);
         list.replaceChildren(document.createTextNode('로그아웃되어 자료를 다시 보려면 로그인해야 합니다.'));
         loginForm.reset();
@@ -332,21 +318,18 @@
       }
     });
 
-    const { data: { session } } = await supabase.auth.getSession();
-    updateAuthUI(session);
-    if (session) {
-      await loadNotes();
-    }
-
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    try {
+      const response = await apiFetch('/api/auth/session');
+      const session = await parseJsonResponse(response);
+      if (!response.ok) throw new Error('로그인 상태를 확인할 수 없습니다.');
       updateAuthUI(session);
-      if (event === 'SIGNED_OUT') {
-        loginForm.reset();
-        list.replaceChildren(document.createTextNode('로그아웃되어 자료를 다시 보려면 로그인해야 합니다.'));
-      } else if (session) {
+      if (session?.user) {
         await loadNotes();
       }
-    });
+    } catch (error) {
+      updateAuthUI(null);
+      setAuthError(error.message || '로그인 상태를 확인할 수 없습니다.');
+    }
   </script>
 </body>
 </html>
