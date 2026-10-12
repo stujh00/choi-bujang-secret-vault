@@ -36,7 +36,13 @@ GitHub에서는 저장소의 현재 기본 브랜치에서 위 문장을 각각 
 - `/api/notes` 목록은 로그인 사용자 메모만 반환합니다.
 - `/api/notes` POST로 메모를 만들고, 메모 생성 시 서버 확인 사용자 ID를 `owner_id`로 저장합니다.
 - `/api/notes/:id`에서 GET, PUT, DELETE로 단건 조회·수정·삭제를 수행합니다.
-- 3단계는 인증은 하되 소유자 검사는 하지 않으며, 이 취약점은 4단계에서 보완합니다.
+- 3단계 저장점 당시에는 단건 API 소유자 검사가 없었으며, 4단계 API에서는 검증된 사용자와 `owner_id`를 대조합니다.
+
+### 4단계 API 소유권 검사와 RLS
+
+현재 Vercel API는 서버 전용 `SUPABASE_SECRET_KEY`로 Supabase에 연결합니다. 이 권한은 RLS를 우회할 수 있으므로, RLS 정책만으로 공개 API의 사용자 간 접근을 막을 수 없습니다. 메모 API의 소유권 검사는 계속 유지해야 합니다. `supabase/step4-rls.sql`은 `vault_notes`의 최소 권한과 소유자별 RLS 정책을 적용하는 수동 학습 스크립트이며, Supabase SQL Editor에서 실행하기 전까지 DB에는 적용되지 않습니다.
+
+4단계 배포 설정은 `aleph.config.json`의 `step: 4`를 사용하며, 공개 빌드와 배포 식별 검사가 1~4단계를 허용합니다. Vercel의 Git 저장소·커밋·배포 주소 검증과 `judgeIssuer`, `sampleMarker` 검증은 계속 적용됩니다. Supabase `identityProvider`와 `allowedRoutes`는 그대로 유지합니다.
 
 다시 실행하는 방법:
 1. 로컬에서 정적 빌드: `npm run build -- --local`

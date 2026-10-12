@@ -65,14 +65,15 @@ export default async function handler(request, response) {
   if (request.method === 'GET' && noteId) {
     const { data, error } = await supabase
       .from('vault_notes')
-      .select('id,title,content')
+      .select('id,title,content,owner_id')
       .eq('id', noteId)
+      .eq('owner_id', login.userId)
       .maybeSingle();
 
     if (error) {
       return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
     }
-    if (!data) {
+    if (!data || data.owner_id !== login.userId) {
       return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
     }
     return response.status(200).json(normalizeNote(data));
@@ -128,10 +129,11 @@ export default async function handler(request, response) {
       .from('vault_notes')
       .update({ title: payload.title, content: payload.body })
       .eq('id', noteId)
-      .select('id,title,content')
+      .eq('owner_id', login.userId)
+      .select('id,title,content,owner_id')
       .single();
 
-    if (error) {
+    if (error || !data || data.owner_id !== login.userId) {
       return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
     }
 
@@ -139,12 +141,18 @@ export default async function handler(request, response) {
   }
 
   if (request.method === 'DELETE' && noteId) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('vault_notes')
       .delete()
-      .eq('id', noteId);
+      .eq('id', noteId)
+      .eq('owner_id', login.userId)
+      .select('id,owner_id')
+      .maybeSingle();
 
     if (error) {
+      return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
+    }
+    if (!data || data.owner_id !== login.userId) {
       return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
     }
 
