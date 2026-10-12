@@ -42,7 +42,17 @@ GitHub에서는 저장소의 현재 기본 브랜치에서 위 문장을 각각 
 
 현재 Vercel API는 서버 전용 `SUPABASE_SECRET_KEY`로 Supabase에 연결합니다. 이 권한은 RLS를 우회할 수 있으므로, RLS 정책만으로 공개 API의 사용자 간 접근을 막을 수 없습니다. 메모 API의 소유권 검사는 계속 유지해야 합니다. `supabase/step4-rls.sql`은 `vault_notes`의 최소 권한과 소유자별 RLS 정책을 적용하는 수동 학습 스크립트이며, Supabase SQL Editor에서 실행하기 전까지 DB에는 적용되지 않습니다.
 
-4단계 배포 설정은 `aleph.config.json`의 `step: 4`를 사용하며, 공개 빌드와 배포 식별 검사가 1~4단계를 허용합니다. Vercel의 Git 저장소·커밋·배포 주소 검증과 `judgeIssuer`, `sampleMarker` 검증은 계속 적용됩니다. Supabase `identityProvider`와 `allowedRoutes`는 그대로 유지합니다.
+4단계 저장점은 `aleph.config.json`의 `step: 4`로 API 소유권 검사와 RLS 설정을 추가했습니다. Vercel의 Git 저장소·커밋·배포 주소 검증과 `judgeIssuer`, `sampleMarker` 검증을 유지합니다.
+
+### 5단계: 자료 요청을 서버 한곳으로 모으기
+
+브라우저는 Supabase Auth로 로그인·로그아웃하고 JWT를 받지만, 메모 조회·추가·수정·삭제는 Vercel의 `/api/notes`와 `/api/notes/:id`만 호출합니다. 서버는 JWT를 검증하고 각 요청에서 확인한 사용자 ID와 `owner_id`를 비교합니다. 브라우저는 Supabase Data API를 직접 호출하지 않습니다.
+
+`aleph.config.json`의 `originalApiUrl`은 원본 Supabase REST 경로를 가리키며, `allowedRoutes`는 현재 메모 API 다섯 경로를 기록합니다. `supabase/step5-revoke-client-table-access.sql`은 `vault_notes`에서 `PUBLIC`, `anon`, `authenticated`의 테이블 권한을 회수합니다. 확인된 결과에서는 anon과 authenticated의 SELECT·INSERT·UPDATE·DELETE가 모두 `false`입니다.
+
+Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RLS를 우회할 수 있습니다. 그러므로 권한 회수와 RLS만으로 서버 API 접근을 보호한다고 가정하지 말고, 기존 JWT 검증과 `owner_id` 검사를 유지해야 합니다. 비밀 키는 브라우저 코드, 정적 파일, 응답, 로그에 넣지 않습니다.
+
+5단계 배포는 `aleph.config.json`의 `step: 5`를 사용합니다. 공개 빌드와 배포 식별 검사는 1~5단계를 허용하며, 기존 Vercel 환경변수·`judgeIssuer`·`sampleMarker` 검증은 계속 적용됩니다. 로컬 정적 빌드 결과의 `/data.json`에는 메모나 `SAMPLE_NOTE_1` 표식이 포함되지 않습니다.
 
 다시 실행하는 방법:
 1. 로컬에서 정적 빌드: `npm run build -- --local`
