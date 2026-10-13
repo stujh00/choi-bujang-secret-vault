@@ -10,7 +10,7 @@ async function fetchText(url, options = {}) {
 }
 
 export async function runAttackChecks(config) {
-  if (![1, 2, 3, 4, 5].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![1, 2, 3, 4, 5, 6].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -80,7 +80,7 @@ export async function runAttackChecks(config) {
     ];
   }
 
-  if (config.step === 5) {
+  if (config.step === 5 || config.step === 6) {
     const { response: pageResponse, text: pageText } = await fetchText(new URL('/', app));
     const { response: identityResponse, text: identityText } = await fetchText(new URL('/aleph.json', app));
     const anonKey = pageText.match(/\bsb_publishable_[A-Za-z0-9_-]{8,}\b/u)?.[0];
@@ -139,7 +139,7 @@ export async function runAttackChecks(config) {
       ? `nil UUID 대상 비인가 PATCH가 HTTP ${sourceUpdateResponse.status}로 거부됨`
       : `nil UUID 대상 비인가 PATCH 결과 HTTP ${sourceUpdateResponse.status}; 권한 거부 여부는 본문 없이 판정할 수 없음`;
 
-    return [
+    const attempts = [
       {
         attackId: 'anonymous_static_data_secrecy',
         expected: '공개 정적 파일에 메모·SAMPLE_NOTE_1·비밀값이 없음',
@@ -158,6 +158,26 @@ export async function runAttackChecks(config) {
         observed: sourceUpdateObserved,
       },
     ];
+    if (config.step === 6) {
+      const { decide, RULE_IDS } = await import('./decider.mjs');
+      const { checkDecider } = await import('../scripts/decider-test.mjs');
+      const localChecks = await checkDecider({ decide, ruleIds: RULE_IDS });
+      const labels = [
+        ['registered_device_read_local', '가상 등록 기기의 자료실 읽기는 허용'],
+        ['unregistered_device_read_local', '가상 미등록 기기의 자료실 읽기는 device_not_registered로 거부'],
+      ];
+      for (let i = 0; i < labels.length; i += 1) {
+        const check = localChecks[i];
+        attempts.push({
+          attackId: labels[i][0],
+          expected: labels[i][1],
+          observed: check?.passed
+            ? '로컬 판정기 가상 요청 연습 통과: ' + check.name
+            : '로컬 판정기 가상 요청 연습 실패: ' + (check?.name || '확인 불가'),
+        });
+      }
+    }
+    return attempts;
   }
 
   const apiResponse = await fetch(new URL('/api/notes', app), {

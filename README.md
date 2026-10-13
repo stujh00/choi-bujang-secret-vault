@@ -121,3 +121,14 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - 경보 추출 확인: `node xdr/exfiltration/read-alerts.mjs`.
 - 판정 결과 재생성: `npm run xdr:run -- exfiltration` → `xdr/exfiltration/result.json`.
 - 전체 회귀 테스트: `npm run test` (Node.js 저장소 환경에서 별도 실행 필요).
+
+## 6단계 저장점: 등록 기기에서만 자료실 읽기
+
+- **현재 진행 단계는 6단계입니다.** 위쪽 1~2단계 설명과 과거 3~5단계 저장점 기록은 해당 당시의 이력을 설명하며, 현재 공개 API가 비로그인으로 메모를 제공한다는 뜻이 아닙니다. 5단계 인증·메모 소유권 보호·서버 API 경유 기능은 그대로 유지합니다.
+- `docs/DECIDER_REQUEST.md`의 SDP 엔진이 검증한 `subjectId`는 사용자 가명 ID, `deviceId`는 검증된 기기 ID이며, 기기 등록 여부는 `deviceRegistered`의 **엄격한 Boolean true**로 판단합니다. 인증서·CA·개인키를 별도로 생성하거나 저장하지 않습니다.
+- `src/decider.mjs`는 등록된 기기의 `notes` 서비스 **GET 읽기 요청**(`GET /notes`, `GET /notes/:id`)만 `allow / approved / device_registered`로 응답합니다. `deviceRegistered`가 false이거나 없으면 `deny / device_not_registered / device_registered`로 거부합니다. 다른 서비스·수정 요청은 기존 `starter.deny`가 거부합니다.
+- 6단계는 운영 엔진의 기기 검증 결과에 대한 판정기 규칙입니다. 인증서가 없는 mTLS 연결, 다른 사용자 토큰 혼합에 대한 검사·차단은 엔진의 선행 인증 기능이 담당합니다. 로컬 판정기 한 파일만으로 실제 인증서 검증이나 사용자-기기 결합 방어를 입증하지 않습니다.
+- `aleph.config.json`의 `step`을 6으로 변경하고 공개 빌드·배포 메타데이터 검사에서도 6단계를 허용합니다. 기존 배포 주소, 신원 발급자, `allowedRoutes`, `originalApiUrl`, `judgeIssuer`는 변경하지 않았습니다.
+- **로컬 가상 요청 검사:** `npm run decider:test` → `통과 · 등록 기기의 정상 요청` 및 `통과 · 미등록 기기의 가상 요청`. 이것은 심판 결과나 실제 기기 등록 성공의 증거가 아닙니다.
+- **정적 빌드 및 회귀 검사:** `npm run build -- --local`, `npm run test`.
+- **제출 점검:** 커밋 후 로컬의 `bundle-notes.json`(Git에 올리지 않음)에 단계 설명을 준비하고, 깨끗한 작업 트리에서 `npm run bundle`을 실행합니다. 결과 `artifacts/submission.json`은 Git에 커밋하지 않습니다. 6단계 직접 점검에는 기존 5단계 정적 노출·원본 API 차단 점검과 등록/미등록 기기 가상 판정 2건을 구분해 남깁니다.

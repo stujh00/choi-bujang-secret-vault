@@ -1,0 +1,45 @@
+name: Stage 6 device policy checks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/decider.mjs'
+      - 'src/attack-check.mjs'
+      - 'scripts/decider-test.mjs'
+      - 'scripts/build-public.mjs'
+      - 'scripts/deployment-identity.mjs'
+      - 'aleph.config.json'
+      - 'test/r5.test.mjs'
+      - '.github/workflows/stage6-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Run registered / unregistered device decision tests
+        run: npm run decider:test
+      - name: Run existing project regression tests
+        run: npm run test
+      - name: Build static files without deployment
+        run: npm run build -- --local
+      - name: Prepare ignored submission explanation (not committed)
+        run: |
+          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"6단계: 검증된 등록 기기의 자료실 GET 읽기만 허용하며 미등록·누락 기기는 device_not_registered로 거부합니다. 기존 사용자 인증·메모 소유권·공개 API 보호·보너스 1~6 코드는 유지합니다. 로컬 기기 판정은 심판과 실제 인증서 검증의 대체가 아닙니다.", blockedAt:null}, null, 2) + "\n")'
+      - name: Create ignored submission bundle from this checked-out commit
+        run: npm run bundle
+      - name: Summarize without printing private responses
+        if: always()
+        run: git status --short

@@ -33,6 +33,7 @@ test('build identity uses Vercel Git and deployment metadata', () => {
   assert.equal(deploymentIdentity(env, { ...config, step: 3 }).step, 3);
   assert.equal(deploymentIdentity(env, { ...config, step: 4 }).step, 4);
   assert.equal(deploymentIdentity(env, { ...config, step: 5 }).step, 5);
+  assert.equal(deploymentIdentity(env, { ...config, step: 6 }).step, 6);
 });
 
 test('first attack check reads public data.json without credentials', async () => {
@@ -144,6 +145,38 @@ test('fifth attack check audits public files and probes anonymous source access 
     assert.deepEqual(JSON.parse(sourceRequests[1].body), { title: null });
     assert.equal(sourceRequests[1].headers.get('authorization'), null);
     assert.equal(requests.some(request => request.method === 'DELETE'), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('sixth attack check retains static/API protection and checks registered device decision locally', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const parsed = new URL(String(url));
+    requests.push({ pathname: parsed.pathname, method: options.method ?? 'GET' });
+    if (parsed.pathname === '/data.json') return Response.json({ notes: [] });
+    if (parsed.pathname === '/') return new Response('<main>자료실</main>', { status: 200 });
+    if (parsed.pathname === '/aleph.json') return Response.json({ step: 6 });
+    if (parsed.pathname === '/rest/v1/vault_notes') return new Response(null, { status: 403 });
+    throw new Error('unexpected URL');
+  };
+  try {
+    const results = await runAttackChecks({
+      ...config,
+      step: 6,
+      originalApiUrl: 'https://student.supabase.co/rest/v1/vault_notes',
+    });
+    assert.equal(results.length, 5);
+    assert.deepEqual(results.slice(3).map(item => item.attackId), [
+      'registered_device_read_local',
+      'unregistered_device_read_local',
+    ]);
+    assert.match(results[3].observed, /연습 통과/u);
+    assert.match(results[4].observed, /연습 통과/u);
+    assert.deepEqual(requests.map(item => item.method), ['GET', 'GET', 'GET', 'GET', 'PATCH']);
+    assert.equal(JSON.stringify(results).includes('가상 본문'), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
