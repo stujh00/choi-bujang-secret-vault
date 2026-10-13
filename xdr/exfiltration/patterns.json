@@ -1,0 +1,58 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "exfiltration",
+  "techniques": [
+    {
+      "id": "T1041",
+      "name": "Exfiltration Over C2 Channel"
+    },
+    {
+      "id": "T1048",
+      "name": "Exfiltration Over Alternative Protocol"
+    }
+  ],
+  "scope": "경보 한 건의 rule.mitre, rule.description, data.srcip, data.dstip, data.bytes, data.files, data.count에 표시된 증거만 비교하며 값 누락을 0으로 가정하지 않습니다.",
+  "patterns": [
+    {
+      "name": "미확인 목적지로 대량 자료 전송",
+      "classification": "high_confidence",
+      "mitre": [
+        "T1041",
+        "T1048"
+      ],
+      "condition": "유효한 출발·목적지 IP, 5천만 바이트 이상, 실제 전송 단서 + 낯선 목적지와 파일 다량·묶음·압축 반복 또는 짧은 시간 전체 자료실 복사",
+      "evidence": "ex-01/05/08/09/10은 대용량 자료·반복·미확인 목적지 또는 자료실 전체 전송 징후를 함께 제공합니다."
+    },
+    {
+      "name": "비정상 시간 압축 파일 반출",
+      "classification": "high_confidence",
+      "mitre": [
+        "T1048"
+      ],
+      "condition": "유효한 출발·목적지 IP, 5천만 바이트 이상, 업무 시간 외 압축 파일 전송 또는 낯선 목적지로 압축 파일 연속 전송",
+      "evidence": "ex-02/07/10에서 수업 시간 밖 혹은 낯선 주소로의 압축 파일 전송이 관찰됩니다."
+    },
+    {
+      "name": "반복·우회 경로의 대량 외부 전송",
+      "classification": "high_confidence",
+      "mitre": [
+        "T1041",
+        "T1048"
+      ],
+      "condition": "유효 IP, 5천만 바이트 이상, 전송 징후 + 5회 이상 반복, 비정상 포트, 명령 통로, 수업 시간 외 같은 목적지 사용 등의 복합 증거",
+      "evidence": "ex-03/04/06/09는 같은 목적지 반복, 비표준 포트 또는 명령 통로와 큰 전송량을 동시에 제공합니다."
+    },
+    {
+      "name": "외부 자료 전송 추가 검토",
+      "classification": "review_only",
+      "mitre": [
+        "T1041",
+        "T1048"
+      ],
+      "condition": "전송·압축·목적지의 의심 정황은 있으나 목적지·전송량·성공 여부 또는 독립적 증거가 부족한 경우",
+      "evidence": "ex-11~20은 중간 크기 단발성 전송, 실패한 전송, 약한 반복 신호 등이 있어 자동 차단 전 추가 확인이 필요합니다."
+    }
+  ],
+  "blockingGuidance": "MITRE 기법·Wazuh level·파일 크기 하나만으로 차단하지 않습니다. 서로 다른 복수 근거와 유효 목적지가 있어야 하며 실제 유출 성공을 주장하지 않습니다.",
+  "normalGuidance": "ex-21~30은 일반 조회·수업 자료 동기화·저장·로그아웃 등으로, 적은 바이트 수나 정상 목적지는 차단하지 않습니다."
+}

@@ -109,3 +109,15 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - 경보 수 확인: `node xdr/privilege/read-alerts.mjs`.
 - 판정 결과 생성: `npm run xdr:run -- privilege` → `xdr/privilege/result.json`.
 - 기존 전체 회귀 테스트: `npm run test` (Node.js 저장소 환경에서 별도 실행해야 합니다).
+
+## 보너스 XDR-06: 자료 반출 및 외부 목적지 차단 후보
+
+- 원본 경보 `xdr/fixtures/exfiltration.json` 30건은 변경하지 않았습니다.
+- `xdr/exfiltration/read-alerts.mjs`는 시각·출발 주소·계정·규칙 수준·설명만 추출하고 목적지 주소나 전송 데이터 원문을 출력하지 않습니다.
+- `patterns.json`과 독립형 `decide.mjs`는 MITRE T1041·T1048을 참고하여 낯선 목적지의 대용량 전송, 업무 외 시간 압축 파일 반출, 반복·우회 경로 전송을 종합적으로 판정합니다.
+- 제공된 경보 30건을 로컬 판정 함수로 검사하면 block 10건, alert 10건, record 10건입니다. 전송량이 크거나 MITRE 태그가 있다는 사실만으로 자동 차단하지 않습니다.
+- `respond.mjs`는 block 판정의 목적지 IP별 임시 deny 후보 규칙을 만들어 기본 15분 뒤 만료시키고, 같은 IP에 대한 여러 근거 경보를 병합합니다. 알림은 `xdr/alerts.log`에 ID·행동·확신도·근거·처리 결과만 기록합니다.
+- **운영 범위:** `xdr-run.mjs`는 `decide.mjs`만 호출합니다. `respond.mjs`는 격리된 실습용 저장소에서 독립 검증했으며, 실제 방화벽·ZTNA 정책에 연결되어 있지 않습니다. `src/decider.mjs`를 수정하거나 실자료 전송을 차단하지 않습니다.
+- 경보 추출 확인: `node xdr/exfiltration/read-alerts.mjs`.
+- 판정 결과 재생성: `npm run xdr:run -- exfiltration` → `xdr/exfiltration/result.json`.
+- 전체 회귀 테스트: `npm run test` (Node.js 저장소 환경에서 별도 실행 필요).
