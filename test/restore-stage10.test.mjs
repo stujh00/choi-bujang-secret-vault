@@ -12,6 +12,7 @@ const reply={data:{restored:true,noteId:TEST_B_NOTE_ID,ownerVerified:true,conten
 const access={kind:'judge',identity:'b',runId:'11111111-1111-4111-8111-111111111111'};
 async function call(overrides={},options={}) {
  let count=0;
+ let verifiedCount=0;
  const state=response();
  await restoreAuthorizedTestNote({
   method:'POST',url:'/api/restore',
