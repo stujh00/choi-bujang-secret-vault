@@ -58,7 +58,7 @@ export async function decide(request) {
   const noteId = typeof request?.path === 'string' ? request.path.slice('/notes/'.length) : '';
   const exactNoteId = noteUuid.test(noteId)
     && noteId !== '00000000-0000-4000-8000-0000000000f0';
-  const fixtureNote = noteId === 'demo' && request?.signals?.source === 'judge_fixture';
+  const fixtureNote = noteId === 'demo' && request?.subjectId === 'learner_fixture';
   const readNotice = notesService && request.method === 'GET'
     && request.route === 'GET /announcements/:id'
     && request.path === '/announcements/00000000-0000-4000-8000-0000000000f0';

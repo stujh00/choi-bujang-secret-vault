@@ -32,7 +32,7 @@ test('resource IDs have separate zones and reject arbitrary or query-selected fu
   assert.equal(exactRoute({url:'/api/announcements/export'},'announcements'),null);
 });
 
-test('client-supplied roles and ownership cannot become a resource permission', () => {
+test('client-supplied roles and ownership cannot become a resource permission', async () => {
   assert.ok(validNotePayload({ title:'mine',body:'lesson',id:ownId }));
   for (const untrusted of [
     { title:'fake',body:'fake',role:'instructor' },

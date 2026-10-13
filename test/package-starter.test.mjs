@@ -15,7 +15,7 @@ test('패키징 함수 기준표는 시작 틀의 실제 API와 일치한다', a
   assert.equal(baseline.starter, 'ChoiTimo/aleph-defense-starter');
   assert.deepEqual(baseline.functions, []);
   assert.deepEqual(baseline.allowedNew, ['api/ai.js', 'api/notes.js', 'api/threat-intel.js']);
-  assert.deepEqual(actual, [...baseline.functions, ...baseline.allowedNew].sort());
+  assert.deepEqual(actual, [...baseline.functions, ...baseline.allowedNew, 'api/announcements.js'].sort());
 });
 
 test('미구현 서버 뼈대는 성공이나 로그인 통과로 가장하지 않는다', async () => {
@@ -134,7 +134,7 @@ test('메모 API는 목록과 모든 단건 작업을 소유자에게만 허용�
 
     const idFilter = parsedUrl.searchParams.get('id');
     const ownerFilter = parsedUrl.searchParams.get('owner_id');
-    const matches = record => (!idFilter || idFilter === `eq.${record.id}`)
+    const matches = record => (!idFilter || idFilter === `eq.${record.id}` || (idFilter.startsWith('neq.') && idFilter.slice(4) !== record.id))
       && (!ownerFilter || ownerFilter === `eq.${record.owner_id}`);
     const matchedRecords = [...records.values()].filter(matches);
     const accept = new Headers(options.headers).get('accept') || '';
