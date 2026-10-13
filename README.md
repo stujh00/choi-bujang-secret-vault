@@ -132,3 +132,14 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - **로컬 가상 요청 검사:** `npm run decider:test` → `통과 · 등록 기기의 정상 요청` 및 `통과 · 미등록 기기의 가상 요청`. 이것은 심판 결과나 실제 기기 등록 성공의 증거가 아닙니다.
 - **정적 빌드 및 회귀 검사:** `npm run build -- --local`, `npm run test`.
 - **제출 점검:** 커밋 후 로컬의 `bundle-notes.json`(Git에 올리지 않음)에 단계 설명을 준비하고, 깨끗한 작업 트리에서 `npm run bundle`을 실행합니다. 결과 `artifacts/submission.json`은 Git에 커밋하지 않습니다. 6단계 직접 점검에는 기존 5단계 정적 노출·원본 API 차단 점검과 등록/미등록 기기 가상 판정 2건을 구분해 남깁니다.
+
+## 7단계 저장점: 평소와 다른 가상 접속은 추가 확인
+
+- **현재 진행 단계는 7단계**입니다. 1~6단계 저장점과 여섯 개 보너스 XDR 모듈은 보존했습니다. 기존 웹 자료실의 서버 인증·소유자 권한·RLS·원본 API 회수 설정을 변경하지 않았습니다.
+- `src/decider.mjs`의 기존 `device_registered`는 유지하고 `step_up_required` 규칙을 추가했습니다. 미등록·등록 정보 누락 기기는 이전처럼 `deny / device_not_registered`로 우선 거부합니다.
+- 엔진이 검증해 전달한 `signals.source === 'judge_fixture'`의 **가상 사건**에서 낯선 지역·네트워크·비정상 시각·최근 5분 이내 다량 활동(10회 이상) 중 2개 이상 겹치면 `step_up / step_up_required`로 추가 본인 확인을 요청합니다. 지역 하나만으로 거부하지 않습니다.
+- 실제 접속의 `signals.source: 'none'`과 클라이언트 임의 헤더는 신뢰할 수 있는 위치 증거로 승격하지 않습니다. 누락된 지역·시각·네트워크·행동을 임의의 정상 값으로 보충하지 않습니다.
+- SDP 엔진이 동일 주체의 최근 추가 인증 결과로 제공한 `stepUp.verified === true`와 `authAgeSeconds` 0~300초만 이 규칙의 재인증 완료로 판단합니다. 검증된 가상 복합 사건은 미완료 시 `step_up`, 완료 시 자료실 **GET 읽기**에 한해 `allow / approved`가 됩니다. 위험한 쓰기 요청은 재확인을 마쳐도 기존 `starter.deny`에서 허용하지 않습니다.
+- **실제 재로그인 완료 및 운영 경로 차단은 미실행입니다.** SDP 반 엔진의 신원 결합·재인증 검증을 모방하거나 실제 사용자 세션·토큰을 다루지 않습니다. 로컬 검사는 계약에 맞춘 가상 요청 연습입니다.
+- 로컬 가상 판정: `npm run decider:test` → 등록·미등록 기기와 복합 이상 접속·재확인 후 접속 4건 통과. `npm run fixture:7` → 정상 `allow`, 복합 이상 `step_up`.
+- 기존 회귀·정적 빌드: `npm run test`, `npm run build -- --local`. 커밋 후 생성하는 `npm run bundle`은 공개 정적 검사·원본 API 비인가 검사와 로컬 가상 판정 4건을 구별해 결과만 기록하고 비밀값은 기록하지 않습니다.

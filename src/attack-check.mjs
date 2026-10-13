@@ -10,7 +10,7 @@ async function fetchText(url, options = {}) {
 }
 
 export async function runAttackChecks(config) {
-  if (![1, 2, 3, 4, 5, 6].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![1, 2, 3, 4, 5, 6, 7].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -80,7 +80,7 @@ export async function runAttackChecks(config) {
     ];
   }
 
-  if (config.step === 5 || config.step === 6) {
+  if (config.step === 5 || config.step === 6 || config.step === 7) {
     const { response: pageResponse, text: pageText } = await fetchText(new URL('/', app));
     const { response: identityResponse, text: identityText } = await fetchText(new URL('/aleph.json', app));
     const anonKey = pageText.match(/\bsb_publishable_[A-Za-z0-9_-]{8,}\b/u)?.[0];
@@ -158,13 +158,17 @@ export async function runAttackChecks(config) {
         observed: sourceUpdateObserved,
       },
     ];
-    if (config.step === 6) {
+    if (config.step === 6 || config.step === 7) {
       const { decide, RULE_IDS } = await import('./decider.mjs');
       const { checkDecider } = await import('../scripts/decider-test.mjs');
       const localChecks = await checkDecider({ decide, ruleIds: RULE_IDS });
       const labels = [
         ['registered_device_read_local', '가상 등록 기기의 자료실 읽기는 허용'],
         ['unregistered_device_read_local', '가상 미등록 기기의 자료실 읽기는 device_not_registered로 거부'],
+        ...(config.step === 7 ? [
+          ['suspicious_step_up_local', '엔진 가상 복합 이상 사건은 추가 인증 전 step_up_required'],
+          ['suspicious_reauthenticated_local', '새 로그인 시각을 엔진이 확인한 뒤 가상 요청을 재판정하여 허용'],
+        ] : []),
       ];
       for (let i = 0; i < labels.length; i += 1) {
         const check = localChecks[i];

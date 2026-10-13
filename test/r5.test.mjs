@@ -34,6 +34,7 @@ test('build identity uses Vercel Git and deployment metadata', () => {
   assert.equal(deploymentIdentity(env, { ...config, step: 4 }).step, 4);
   assert.equal(deploymentIdentity(env, { ...config, step: 5 }).step, 5);
   assert.equal(deploymentIdentity(env, { ...config, step: 6 }).step, 6);
+  assert.equal(deploymentIdentity(env, { ...config, step: 7 }).step, 7);
 });
 
 test('first attack check reads public data.json without credentials', async () => {
@@ -177,6 +178,37 @@ test('sixth attack check retains static/API protection and checks registered dev
     assert.match(results[4].observed, /연습 통과/u);
     assert.deepEqual(requests.map(item => item.method), ['GET', 'GET', 'GET', 'GET', 'PATCH']);
     assert.equal(JSON.stringify(results).includes('가상 본문'), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('seventh attack self-check reports mock step-up before and after engine-verified login', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const parsed = new URL(String(url));
+    requests.push(options.method ?? 'GET');
+    if (parsed.pathname === '/data.json') return Response.json({ notes: [] });
+    if (parsed.pathname === '/') return new Response('<main>자료실</main>', { status: 200 });
+    if (parsed.pathname === '/aleph.json') return Response.json({ step: 7 });
+    if (parsed.pathname === '/rest/v1/vault_notes') return new Response(null, { status: 403 });
+    throw new Error('Unexpected stage7 URL');
+  };
+  try {
+    const result = await runAttackChecks({
+      ...config,
+      step: 7,
+      originalApiUrl: 'https://student.supabase.co/rest/v1/vault_notes',
+    });
+    assert.equal(result.length, 7);
+    assert.deepEqual(result.slice(3).map(item => item.attackId), [
+      'registered_device_read_local', 'unregistered_device_read_local',
+      'suspicious_step_up_local', 'suspicious_reauthenticated_local',
+    ]);
+    assert.ok(result.slice(3).every(item => item.observed.includes('연습 통과')));
+    assert.deepEqual(requests, ['GET', 'GET', 'GET', 'GET', 'PATCH']);
+    assert.doesNotMatch(JSON.stringify(result), /Bearer\\s|eyJ|가상 본문/u);
   } finally {
     globalThis.fetch = originalFetch;
   }

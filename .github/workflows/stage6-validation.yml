@@ -1,4 +1,4 @@
-name: Stage 6 device policy checks
+name: Stage 7 step-up policy checks
 
 on:
   push:
@@ -11,6 +11,8 @@ on:
       - 'scripts/deployment-identity.mjs'
       - 'aleph.config.json'
       - 'test/r5.test.mjs'
+      - 'test/decider-stage7.test.mjs'
+      - 'package.json'
       - '.github/workflows/stage6-validation.yml'
   workflow_dispatch:
 
@@ -33,19 +35,21 @@ jobs:
         run: npm ci
       - name: Run registered / unregistered device decision tests
         run: npm run decider:test
+      - name: Run stage 7 synthetic access scenario
+        run: npm run fixture:7
       - name: Run existing project regression tests
         run: npm run test
       - name: Build static files without deployment
         run: npm run build -- --local
       - name: Prepare ignored submission explanation (not committed)
         run: |
-          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"6단계: 검증된 등록 기기의 자료실 GET 읽기만 허용하며 미등록·누락 기기는 device_not_registered로 거부합니다. 기존 사용자 인증·메모 소유권·공개 API 보호·보너스 1~6 코드는 유지합니다. 로컬 기기 판정은 심판과 실제 인증서 검증의 대체가 아닙니다.", blockedAt:null}, null, 2) + "\n")'
+          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"7단계: 검증된 등록 기기 규칙을 유지하면서 엔진이 제공한 가상 복합 이상 접속에 step_up_required를 적용했습니다. 최근 재인증이 검증되지 않으면 step_up, 확인 후 자료실 GET 읽기만 허용합니다. 실서비스 재로그인은 검증하지 않았으며 이전 보안 기능을 유지합니다.", blockedAt:null}, null, 2) + "\n")'
       - name: Create ignored submission bundle from this checked-out commit
         run: npm run bundle
       - name: Archive sanitized submission metadata
         uses: actions/upload-artifact@v4
         with:
-          name: stage6-submission
+          name: stage7-submission
           path: artifacts/submission.json
           retention-days: 7
       - name: Summarize without printing private responses
