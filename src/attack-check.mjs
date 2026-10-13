@@ -10,7 +10,7 @@ async function fetchText(url, options = {}) {
 }
 
 export async function runAttackChecks(config) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -80,7 +80,7 @@ export async function runAttackChecks(config) {
     ];
   }
 
-  if (config.step === 5 || config.step === 6 || config.step === 7 || config.step === 8) {
+  if (config.step === 5 || config.step === 6 || config.step === 7 || config.step === 8 || config.step === 9) {
     const { response: pageResponse, text: pageText } = await fetchText(new URL('/', app));
     const { response: identityResponse, text: identityText } = await fetchText(new URL('/aleph.json', app));
     const anonKey = pageText.match(/\bsb_publishable_[A-Za-z0-9_-]{8,}\b/u)?.[0];
@@ -158,7 +158,7 @@ export async function runAttackChecks(config) {
         observed: sourceUpdateObserved,
       },
     ];
-    if (config.step === 6 || config.step === 7 || config.step === 8) {
+    if (config.step === 6 || config.step === 7 || config.step === 8 || config.step === 9) {
       const { decide, RULE_IDS } = await import('./decider.mjs');
       const { checkDecider } = await import('../scripts/decider-test.mjs');
       const localChecks = await checkDecider({ decide, ruleIds: RULE_IDS });
@@ -181,7 +181,7 @@ export async function runAttackChecks(config) {
         });
       }
     }
-    if (config.step === 8) {
+    if (config.step === 8 || config.step === 9) {
       const { ANNOUNCEMENT_ID, exactRoute, verifiedInstructor } = await import('./resource-zones.mjs');
       const validNoteRoute = exactRoute({
         url: '/api/notes/00000000-0000-4000-8000-000000000001',
@@ -220,6 +220,31 @@ export async function runAttackChecks(config) {
         expected: '실제 다른 계정의 단건·목록·수정 API가 소유자 검사로 거부',
         observed: '미실행: 다른 계정의 비밀값 없이 운영 DB 교차 계정 요청은 수행하지 않음',
       });
+    }
+    if (config.step === 9) {
+      const { detect } = await import('./detect.mjs');
+      const { checkDetection } = await import('../scripts/detect-test.mjs');
+      const localChecks = await checkDetection(detect);
+      const names = [
+        ['normal_read_observe_local', '정상 조회 30건에서는 회수 제안이 없어야 함'],
+        ['boundary_120_observe_local', '10분 안에 120건까지는 observe'],
+        ['burst_121_proposal_local', '10분 안에 121건부터 burst_read 회수 제안'],
+        ['burst_200_proposal_local', '200건 폭주 조회는 burst_read 회수 제안'],
+        ['mixed_users_observe_local', '서로 다른 가명 사용자 조회는 합산하지 않음'],
+        ['outside_window_observe_local', '10분 밖의 조회는 같은 묶음으로 계산하지 않음'],
+      ];
+      for (let i = 0; i < names.length; i += 1) {
+        const check = localChecks[i];
+        attempts.push({
+          attackId: names[i][0],
+          expected: names[i][1],
+          observed: check?.passed
+            ? '가상 탐지 연습 통과: ' + check.name
+            : '가상 탐지 연습 실패: ' + (check?.name ?? '검증 불가'),
+        });
+      }
+      // No device ID is included in docs/DETECT_EVENTS.md. This does not
+      // claim to revoke a real session or measure a real response time.
     }
     return attempts;
   }

@@ -36,6 +36,7 @@ test('build identity uses Vercel Git and deployment metadata', () => {
   assert.equal(deploymentIdentity(env, { ...config, step: 6 }).step, 6);
   assert.equal(deploymentIdentity(env, { ...config, step: 7 }).step, 7);
   assert.equal(deploymentIdentity(env, { ...config, step: 8 }).step, 8);
+  assert.equal(deploymentIdentity(env, { ...config, step: 9 }).step, 9);
 });
 
 test('first attack check reads public data.json without credentials', async () => {
@@ -241,4 +242,36 @@ test('eighth attack self-check distinguishes resources and marks live cross-user
     assert.match(out[9].observed, /미실행/u);
     assert.deepEqual(calls.map(c => c[1]),['GET','GET','GET','GET','PATCH']);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('ninth self-check records documented detector exercises, not live revocation', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const path = new URL(String(url)).pathname;
+    calls.push(options.method ?? 'GET');
+    if (path === '/data.json') return Response.json({ notes: [] });
+    if (path === '/') return new Response('<main>자료실</main>', { status: 200 });
+    if (path === '/aleph.json') return Response.json({ step: 9 });
+    if (path === '/rest/v1/vault_notes') return new Response(null, { status: 403 });
+    throw new Error('unexpected stage 9 URL');
+  };
+  try {
+    const attempts = await runAttackChecks({
+      ...config, step: 9,
+      originalApiUrl: 'https://student.supabase.co/rest/v1/vault_notes',
+    });
+    assert.equal(attempts.length, 16);
+    assert.deepEqual(attempts.slice(-6).map(row => row.attackId), [
+      'normal_read_observe_local', 'boundary_120_observe_local',
+      'burst_121_proposal_local', 'burst_200_proposal_local',
+      'mixed_users_observe_local', 'outside_window_observe_local',
+    ]);
+    assert.ok(attempts.slice(-6).every(row => row.observed.startsWith('가상 탐지 연습 통과')));
+    assert.match(attempts[9].observed, /미실행/u);
+    assert.deepEqual(calls, ['GET','GET','GET','GET','PATCH']);
+    assert.doesNotMatch(JSON.stringify(attempts), /eyJ[A-Za-z0-9_-]{12,}|Bearer\s+[\w.-]+/u);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -6,7 +6,7 @@ const root = resolve(import.meta.dirname, '..');
 const source = resolve(root, 'data.json');
 const output = resolve(root, 'public', 'data.json');
 const config = JSON.parse(await readFile(resolve(root, 'aleph.config.json'), 'utf8'));
-if (![1, 2, 3, 4, 5, 6, 7, 8].includes(config.step)) {
+if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(config.step)) {
   throw new Error('지원하지 않는 단계입니다.');
 }
 const data = JSON.parse(await readFile(source, 'utf8'));

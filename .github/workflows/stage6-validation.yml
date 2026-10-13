@@ -1,4 +1,4 @@
-name: Stage 8 resource boundary checks
+name: Stage 9 verified-event detector checks
 
 on:
   push:
@@ -13,6 +13,10 @@ on:
       - 'test/r5.test.mjs'
       - 'test/decider-stage7.test.mjs'
       - 'test/zone-stage8.test.mjs'
+      - 'test/detect-stage9.test.mjs'
+      - 'src/detect.mjs'
+      - 'docs/DETECT_EVENTS.md'
+      - 'scripts/detect-test.mjs'
       - 'src/resource-zones.mjs'
       - 'src/announcement-api.mjs'
       - 'api/notes.js'
@@ -44,19 +48,21 @@ jobs:
         run: npm run decider:test
       - name: Run stage 7 synthetic access scenario
         run: npm run fixture:7
+      - name: Test stage 9 synthetic burst detection
+        run: npm run detect:test
       - name: Run existing project regression tests
         run: npm run test
       - name: Build static files without deployment
         run: npm run build -- --local
       - name: Prepare ignored submission explanation (not committed)
         run: |
-          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"8단계: 메모 UUID와 공지 UUID를 구별하고 검증된 사용자 ID에 묶인 owner_id로 메모를 필터링합니다. 공지 변경은 Supabase Auth 관리자 메타데이터의 강사 권한을 확인합니다. 판정기에는 소유자 정보가 없으므로 수정은 기본 거부하며, 운영 DB 교차 계정 시험은 미실행입니다.", blockedAt:null}, null, 2) + "\n")'
+          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"9단계: docs/DETECT_EVENTS.md 계약에 따라 같은 가명 주체의 10분 내 GET 121건 이상에서만 burst_read 신원 회수 제안을 반환합니다. 정상 기기와 다른 주체의 사건은 합산하지 않으며, 기기 ID나 네트워크 정보가 없어 실제 기기·세션 회수와 시간 측정은 심판 엔진에서만 가능합니다.", blockedAt:null}, null, 2) + "\n")'
       - name: Create ignored submission bundle from this checked-out commit
         run: npm run bundle
       - name: Archive sanitized submission metadata
         uses: actions/upload-artifact@v4
         with:
-          name: stage8-submission
+          name: stage9-submission
           path: artifacts/submission.json
           retention-days: 7
       - name: Summarize without printing private responses
