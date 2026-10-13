@@ -2,6 +2,12 @@ import { readJsonBody } from './auth-session.mjs';
 
 export const TEST_B_NOTE_ID = '00000000-0000-4000-8000-000000000005';
 
+// Safe operational diagnostics: no tokens, note contents, user IDs or secrets.
+function restoreFailure(stage, reason) {
+  console.warn('VAULT_RESTORE_REJECTED', JSON.stringify({ stage, reason }));
+}
+
+
 export async function restoreAuthorizedTestNote(request, response, { verifyAuthorization, verifyBackup, restoreFromBackup }) {
   response.setHeader('Cache-Control', 'no-store');
   if (request.method !== 'POST') return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
@@ -18,8 +24,9 @@ export async function restoreAuthorizedTestNote(request, response, { verifyAutho
   }
   let identity;
   try { identity = await verifyAuthorization(authorization); } catch { identity = null; }
-  if (!identity) return response.status(401).json({ error: 'AUTH_REQUIRED' });
+  if (!identity) { restoreFailure('authorization', 'invalid_token'); return response.status(401).json({ error: 'AUTH_REQUIRED' }); }
   if (identity.kind !== 'judge' || identity.identity !== 'b' || !identity.runId) {
+    restoreFailure('authorization', 'wrong_identity');
     return response.status(403).json({ error: 'RESTORE_FORBIDDEN' });
   }
   if (Number(request.headers?.['content-length'] ?? 0) > 2048) {
@@ -37,21 +44,25 @@ export async function restoreAuthorizedTestNote(request, response, { verifyAutho
   // Never attempt a DB mutation when the verification fails or is unavailable.
   let verification;
   try { verification = await verifyBackup(); } catch {
+    restoreFailure('precheck', 'rpc_exception');
     return response.status(503).json({ error: 'VERIFIED_BACKUP_UNAVAILABLE' });
   }
   const proof = verification?.data;
   if (verification?.error || proof?.verified !== true || proof?.noteId !== TEST_B_NOTE_ID
       || proof?.ownerVerified !== true || !/^[0-9a-f]{64}$/.test(proof?.contentSha256 ?? '')) {
+    restoreFailure('precheck', verification?.error ? 'rpc_error' : 'invalid_proof');
     return response.status(503).json({ error: 'VERIFIED_BACKUP_UNAVAILABLE' });
   }
   let result;
   try { result = await restoreFromBackup(); } catch {
+    restoreFailure('restore', 'rpc_exception');
     return response.status(503).json({ error: 'VERIFIED_BACKUP_UNAVAILABLE' });
   }
   const value = result?.data;
   if (result?.error || value?.restored !== true || value?.noteId !== TEST_B_NOTE_ID
       || value?.ownerVerified !== true || !/^[0-9a-f]{64}$/.test(value?.contentSha256 ?? '')
       || value.contentSha256 !== proof.contentSha256) {
+    restoreFailure('restore', result?.error ? 'rpc_error' : 'invalid_result');
     return response.status(503).json({ error: 'VERIFIED_BACKUP_UNAVAILABLE' });
   }
   return response.status(200).json({ restored:true, noteId:TEST_B_NOTE_ID,
