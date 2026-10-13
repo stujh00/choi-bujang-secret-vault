@@ -97,3 +97,15 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - 경보 요약 실행: `node xdr/persistence/read-alerts.mjs`
 - 판정 시험: `npm run xdr:run -- persistence` → `xdr/persistence/result.json` 생성
 - 전체 프로젝트 회귀 시험: `npm run test` (별도 Node.js 실행 환경에서 확인해야 합니다).
+
+## 보너스 XDR-05: 권한 가로채기 징후 및 세션 회수 후보
+
+- Wazuh 형식의 수업용 `xdr/fixtures/privilege.json` 26건은 변경하지 않습니다.
+- `xdr/privilege/read-alerts.mjs`는 시각·출발 주소·계정·규칙 수준·설명만 읽고 경보 원문 또는 비밀값은 표시하지 않습니다.
+- `patterns.json`에는 MITRE T1068(권한 상승 악용)·T1078(정상 계정 도용)을 참고하여 비정상 관리자 그룹 추가, 승격 직후 명령 사용, 대량 변경·재부여와 모호한 사건을 구별합니다.
+- `decide.mjs`는 외부 패키지와 파일 접근 없이 `decide(alert)`를 실행합니다. 명확한 권한 상승·가로채기 징후는 block, 모호하면 alert, 일반 로그인·조회는 record입니다.
+- `respond.mjs`는 유효한 block에 대해 계정 이름 기준의 **세션 회수 후보 규칙**을 독립 저장합니다. 규칙은 기본 15분 후 만료되며 동일 계정의 경보 근거를 병합합니다. `xdr/alerts.log`에는 경보 ID, 행동, 확신도, 사유와 처리 결과만 기록합니다.
+- **범위 제한:** Wazuh `data.srcuser`는 검증된 ZTNA `subjectId`가 아니므로 현재 `src/decider.mjs`에 실제 연결되지 않았습니다. Supabase 로그아웃이나 운영 사용자의 세션 무효화는 수행하지 않습니다.
+- 경보 수 확인: `node xdr/privilege/read-alerts.mjs`.
+- 판정 결과 생성: `npm run xdr:run -- privilege` → `xdr/privilege/result.json`.
+- 기존 전체 회귀 테스트: `npm run test` (Node.js 저장소 환경에서 별도 실행해야 합니다).
