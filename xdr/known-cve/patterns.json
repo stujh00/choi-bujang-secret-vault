@@ -1,0 +1,40 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "known-cve",
+  "mitreTechnique": {
+    "id": "T1190",
+    "name": "Exploit Public-Facing Application"
+  },
+  "cve": "CVE-2021-44228",
+  "patterns": [
+    {
+      "name": "JNDI 머리글 원격 조회 구문",
+      "classification": "high_confidence",
+      "condition": "data.useragent 또는 data.headers에 완전한 원격 JNDI 조회 형식, 유효 출발 IP",
+      "evidence": "kc-01/04/07/08의 요청 머리글에서 원격 조회 형식을 확인했습니다.",
+      "mitre": [
+        "T1190"
+      ]
+    },
+    {
+      "name": "JNDI URL 인자 원격 조회 구문",
+      "classification": "high_confidence",
+      "condition": "data.url의 요청 인자에 완전한 원격 JNDI 조회 형식, 유효 출발 IP",
+      "evidence": "kc-02/03/05/06/08의 URL에서 원격 조회 형식을 확인했습니다.",
+      "mitre": [
+        "T1190"
+      ]
+    },
+    {
+      "name": "알려진 취약점 단서 추가 검토",
+      "classification": "review_only",
+      "condition": "MITRE T1190 또는 취약점 이름·점검 도구·JNDI 단서만 있고 완전한 원격 조회 구문은 없음",
+      "evidence": "kc-09~16의 CVE 이름·수업 노트·도구 흔적은 악용 형태를 입증하지 않습니다.",
+      "mitre": [
+        "T1190"
+      ]
+    }
+  ],
+  "blockingGuidance": "CVE 이름, JNDI 단어 또는 높은 규칙 수준만으로 차단하지 않습니다. 실제 원격 조회 표기에서만 block을 반환하며 공격 성공을 의미하지 않습니다.",
+  "normalGuidance": "T1190 및 원격 조회 흔적이 없는 일반 요청은 record입니다."
+}

@@ -76,3 +76,12 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 [AGENTS.md](AGENTS.md)를 먼저 읽히고 한 번에 한 제작 단위만 요청하세요. 2단계부터는 자료 보호를 구현할 때 `public/data.json`을 복사하는 1단계 빌드 흐름도 함께 바꿔야 합니다. 3단계 이후의 로그인, 허용 경로, 5단계의 원본 API 주소, 6단계 이후 정책 규칙은 해당 단계 원고와 계약에 맞춰 추가합니다. 비밀번호·토큰·서버 전용 키·실제 학생 기록을 코드, Git, 제출 묶음에 넣지 않습니다.
 
 `src/decider.mjs`와 `src/detect.mjs`의 로컬 시험은 반 엔진이나 운영 심판의 결과가 아닙니다. 1단계 이후 제출 묶음 계약 `aleph.defense.submission.v2`는 `scripts/bundle.mjs`에 남아 있으며, 코딩 도구가 해당 단계의 최신 배포 주소와 Git 원격을 맞춘 뒤 사용합니다.
+
+## 보너스 XDR-03: 알려진 취약점 악용 탐지
+
+- 수업용 경보 24건은 xdr/fixtures/known-cve.json에 있으며 수정하지 않았습니다.
+- xdr/known-cve/read-alerts.mjs는 시각·출발 IP·계정·규칙 수준·설명만 추출하고 요청 페이로드를 출력하지 않습니다.
+- xdr/known-cve/decide.mjs는 외부 의존 없이 JNDI 원격 조회 표기를 탐지하고, CVE 이름이나 점검 흔적만 있는 경보는 alert로 분류합니다.
+- xdr/known-cve/respond.mjs는 차단 후보용 기한부 규칙과 xdr/alerts.log 기록을 위한 독립 모듈입니다. 기본 15분 만료이며 규칙은 기존 ZTNA src/decider.mjs에 실제로 연결되지 않습니다.
+- 판정 실행: npm run xdr:run -- known-cve (xdr/known-cve/result.json 생성).
+- 전체 프로젝트 테스트: npm run test. read-alerts.mjs의 요약 실행: node xdr/known-cve/read-alerts.mjs.
