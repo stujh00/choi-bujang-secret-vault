@@ -85,3 +85,15 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - xdr/known-cve/respond.mjs는 차단 후보용 기한부 규칙과 xdr/alerts.log 기록을 위한 독립 모듈입니다. 기본 15분 만료이며 규칙은 기존 ZTNA src/decider.mjs에 실제로 연결되지 않습니다.
 - 판정 실행: npm run xdr:run -- known-cve (xdr/known-cve/result.json 생성).
 - 전체 프로젝트 테스트: npm run test. read-alerts.mjs의 요약 실행: node xdr/known-cve/read-alerts.mjs.
+
+## 보너스 XDR-04: 지속성 공격 탐지 및 임시 격리 후보
+
+- 수업용 Wazuh 경보는 `xdr/fixtures/persistence.json` 총 24건입니다. 원본 경보는 변경하지 않습니다.
+- `xdr/persistence/read-alerts.mjs`는 시각·출발 주소·계정·수준·설명만 읽고, 경보 원문이나 경로에 있을 수 있는 비밀값을 콘솔에 출력하지 않습니다.
+- `patterns.json`은 MITRE T1543·T1053과 서비스 등록·예약 작업·시작 프로그램 단서를 정리합니다.
+- 오프라인 독립 모듈 `decide.mjs`는 명확한 서비스·작업·시작 프로그램 지속성 공격만 block, 증거 부족 경보는 alert, 기존 정상 이벤트는 record로 반환합니다. 경보 번호별 하드코딩을 사용하지 않습니다.
+- `respond.mjs`는 후보 차단 경보의 **agent.name**을 기준으로 임시 격리 후보 규칙을 생성하고, 중복 경보를 병합하며 기본 15분 후 만료합니다. `xdr/alerts.log`에는 원본 실행 파일 경로나 원본 경보를 기록하지 않습니다.
+- **주의:** Wazuh agent.name은 운영 엔진이 확인한 deviceId가 아닙니다. 현재 `src/decider.mjs`는 `starter.deny` 상태이며, ZTNA 접근 계약과 이 후보 규칙을 연결하는 검증된 기기 매핑은 없습니다. 실제 기기 격리·정상 사용자 접근 허용·운영 방화벽 차단은 구현하거나 주장하지 않습니다.
+- 경보 요약 실행: `node xdr/persistence/read-alerts.mjs`
+- 판정 시험: `npm run xdr:run -- persistence` → `xdr/persistence/result.json` 생성
+- 전체 프로젝트 회귀 시험: `npm run test` (별도 Node.js 실행 환경에서 확인해야 합니다).

@@ -1,0 +1,57 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "persistence",
+  "mitreTechniques": [
+    {
+      "id": "T1543",
+      "name": "Create or Modify System Process"
+    },
+    {
+      "id": "T1053",
+      "name": "Scheduled Task/Job"
+    }
+  ],
+  "scope": "한 경보의 rule.description, rule.mitre, data.path, data.count만으로 판단",
+  "patterns": [
+    {
+      "name": "서명 없는 신규·변경 서비스 지속성",
+      "mitre": [
+        "T1543"
+      ],
+      "classification": "high_confidence",
+      "condition": "신규·수정 서비스 + 서명 없음 + 임시 실행 파일 또는 3건 이상 연속 등록, 혹은 평소 목록에 없는 지속성 서비스 + 임시 실행 파일",
+      "evidence": "ps-01/04/06/08은 미서명 서비스 변경, 임시 실행 파일, 반복 등록 또는 재부팅 후 유지 단서를 제공합니다."
+    },
+    {
+      "name": "낯선 예약 작업의 임시 실행 파일",
+      "mitre": [
+        "T1053"
+      ],
+      "classification": "high_confidence",
+      "condition": "낯선 예약 작업 또는 임의 이름의 예약 작업이 임시 실행 파일을 참조하거나 수업 시간 외에 생성됨",
+      "evidence": "ps-02/05는 낯선 예약 작업과 수업 외 실행 또는 임의 이름·임시 실행 파일의 조합입니다."
+    },
+    {
+      "name": "비인가 시작 프로그램 및 예약 작업 연계",
+      "mitre": [
+        "T1543",
+        "T1053"
+      ],
+      "classification": "high_confidence",
+      "condition": "평소 목록에 없던 시작 폴더 프로그램 추가 또는 예약 작업과 시작 프로그램의 동일 임시 실행 파일 사용",
+      "evidence": "ps-03/07에서 시작 폴더 신규 파일, 예약 작업·시작 프로그램의 동일 임시 파일 참조가 관찰됩니다."
+    },
+    {
+      "name": "지속성 의심 이벤트 추가 검토",
+      "mitre": [
+        "T1543",
+        "T1053"
+      ],
+      "classification": "review_only",
+      "condition": "관련 서비스·예약 작업·시작 프로그램의 변화는 있지만 등록·서명·경로·실행 근거가 불충분",
+      "evidence": "ps-09~16은 수업용 예약 작업이나 단일 변경에 해당해 추가 확인 없이는 자동 격리할 수 없습니다."
+    }
+  ],
+  "normalGuidance": "평소 업데이트·기존 서명 서비스·기존 예약 작업 등은 MITRE 기법이 기록됐다는 이유만으로 block하지 않습니다.",
+  "blockingGuidance": "경보 ID 및 Wazuh level만으로 차단하지 않으며 여러 독립 근거가 필요합니다."
+}
