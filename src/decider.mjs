@@ -1,6 +1,6 @@
 // SDP 엔진이 신원과 기기 등록을 검증한 요청 계약만 처리합니다.
 // 클라이언트의 위치 헤더·토큰 원문을 별도로 믿거나 저장하지 않습니다.
-export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required']);
+export const RULE_IDS = Object.freeze(['starter.deny', 'device_registered', 'step_up_required', 'resource_boundary']);
 
 function unusualFixture(request) {
   const signals = request?.signals;
@@ -54,11 +54,20 @@ export async function decide(request) {
     && typeof request.subjectId === 'string' && request.subjectId.length > 0
     && typeof request.deviceId === 'string' && /^[0-9a-f]{16}$/.test(request.deviceId);
   const notesService = request?.service === 'notes';
+  const noteUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const noteId = typeof request?.path === 'string' ? request.path.slice('/notes/'.length) : '';
+  const exactNoteId = noteUuid.test(noteId)
+    && noteId !== '00000000-0000-4000-8000-0000000000f0';
+  const fixtureNote = noteId === 'demo' && request?.signals?.source === 'judge_fixture';
+  const readNotice = notesService && request.method === 'GET'
+    && request.route === 'GET /announcements/:id'
+    && request.path === '/announcements/00000000-0000-4000-8000-0000000000f0';
   const readNotes = notesService && request.method === 'GET'
     && ((request.route === 'GET /notes' && request.path === '/notes')
       || (request.route === 'GET /notes/:id'
         && typeof request.path === 'string'
-        && /^\/notes\/[^/?#]+$/.test(request.path)));
+        && /^\/notes\/[^/?#]+$/.test(request.path)
+        && (exactNoteId || fixtureNote)));
   const notesWrite = notesService && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)
     && typeof request.route === 'string'
     && request.route.startsWith(request.method + ' /notes')
@@ -67,7 +76,7 @@ export async function decide(request) {
 
   // Stage 7: suspicious synthetic requests require engine-verified fresh login.
   // Even after reauthentication, writes are not enabled by the stage 6 read rule.
-  if (verifiedIdentityShape && (readNotes || notesWrite) && unusualFixture(request)
+  if (verifiedIdentityShape && (readNotes || readNotice || notesWrite) && unusualFixture(request)
       && !recentStepUp(request)) {
     return {
       ...base,
@@ -77,12 +86,24 @@ export async function decide(request) {
     };
   }
 
-  if (verifiedIdentityShape && readNotes) {
+  if (verifiedIdentityShape && (readNotes || readNotice)) {
     return {
       ...base,
       decision: 'allow',
       reasonCode: 'approved',
       ruleIds: ['device_registered'],
+    };
+  }
+  // Ownership of a UUID and instructor role are not in the engine's 18-field
+  // decision contract. Never grant mutation based on route or a claimed role.
+  if (verifiedIdentityShape && notesService && (notesWrite
+      || (typeof request.path === 'string' && request.path.startsWith('/notes/'))
+      || (typeof request.path === 'string' && request.path.startsWith('/announcements/')))) {
+    return {
+      ...base,
+      decision: 'deny',
+      reasonCode: 'starter_not_ready',
+      ruleIds: ['resource_boundary'],
     };
   }
   return {

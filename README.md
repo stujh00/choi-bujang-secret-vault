@@ -143,3 +143,13 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - **실제 재로그인 완료 및 운영 경로 차단은 미실행입니다.** SDP 반 엔진의 신원 결합·재인증 검증을 모방하거나 실제 사용자 세션·토큰을 다루지 않습니다. 로컬 검사는 계약에 맞춘 가상 요청 연습입니다.
 - 로컬 가상 판정: `npm run decider:test` → 등록·미등록 기기와 복합 이상 접속·재확인 후 접속 4건 통과. `npm run fixture:7` → 정상 `allow`, 복합 이상 `step_up`.
 - 기존 회귀·정적 빌드: `npm run test`, `npm run build -- --local`. 커밋 후 생성하는 `npm run bundle`은 공개 정적 검사·원본 API 비인가 검사와 로컬 가상 판정 4건을 구별해 결과만 기록하고 비밀값은 기록하지 않습니다.
+
+## 8단계 저장점: 자원 구역별 서버 권한 검사
+
+- 현재 단계는 **8단계**입니다. 기존 1~7단계와 보너스 XDR 1~6의 코드는 보존합니다.
+- `src/resource-zones.mjs`에서 개인 메모는 `/api/notes/:id`의 UUID, 강사 공지는 `/api/announcements/:id`의 예약 UUID `00000000-0000-4000-8000-0000000000f0`로 명확히 구분합니다. `export` 등 기능 별칭·중첩 경로·쿼리 기반 ID 선택은 거부합니다. UI 메뉴와 메모 본문은 수정하지 않습니다.
+- 기존 Supabase `vault_notes`의 개인 메모를 전부 보존합니다. `/api/notes` 목록은 서버 검증 사용자 ID를 `owner_id`로 조회하고, 결과 행의 `owner_id`도 재확인합니다. 단건 GET·PUT·DELETE도 ID와 DB의 `owner_id`를 함께 적용합니다. 공지 UUID는 개인 메모 목록·단건 API에서 제외합니다.
+- 공지는 기존 테이블의 **예약 UUID 하나**에만 별도 보관합니다. 인증된 학생은 `/api/announcements`에서 게시된 공지를 조회할 수 있으나, 게시·수정·삭제는 서버에서 확인한 Supabase Auth Admin `app_metadata.vault_role === 'instructor'`인 사용자에게만 허용됩니다. 브라우저 입력, 요청 본문의 role, 변경 가능한 `user_metadata`는 무시합니다. 강사 역할이 지정되지 않았다면 쓰기는 기본 거부됩니다.
+- **강사 권한이나 공지를 자동으로 생성하지 않았습니다.** 필요시 운영자가 Supabase의 관리자 권한을 통해 실제 강사 사용자의 `app_metadata.vault_role`을 `instructor`로 지정해야 합니다. 이름·이메일·토큰은 Git에 기록하지 않습니다. 공지 게시 API는 그 후 정상 동작합니다.
+- SDP 판정기 요청 계약에는 실제 메모의 `owner_id`나 강사 역할이 없습니다. 따라서 `src/decider.mjs`는 자원 경로를 엄격히 판단하되 소유권 확인이 불가능한 쓰기 권한을 새로 허용하지 않습니다. 최종 데이터 구역은 서버 API와 DB가 검증합니다. 학생 계정의 강사 공지 수정은 거부됩니다.
+- **검증:** `npm run decider:test`, `npm run fixture:7`, `npm run test`, `npm run build -- --local`. `npm run bundle`의 교차 계정 실서비스 검증은 운영 계정 비밀값 없이 실행하지 않았으므로 `미실행`으로 기록합니다.

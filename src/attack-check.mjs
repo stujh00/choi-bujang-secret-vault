@@ -10,7 +10,7 @@ async function fetchText(url, options = {}) {
 }
 
 export async function runAttackChecks(config) {
-  if (![1, 2, 3, 4, 5, 6, 7].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -80,7 +80,7 @@ export async function runAttackChecks(config) {
     ];
   }
 
-  if (config.step === 5 || config.step === 6 || config.step === 7) {
+  if (config.step === 5 || config.step === 6 || config.step === 7 || config.step === 8) {
     const { response: pageResponse, text: pageText } = await fetchText(new URL('/', app));
     const { response: identityResponse, text: identityText } = await fetchText(new URL('/aleph.json', app));
     const anonKey = pageText.match(/\bsb_publishable_[A-Za-z0-9_-]{8,}\b/u)?.[0];
@@ -158,14 +158,14 @@ export async function runAttackChecks(config) {
         observed: sourceUpdateObserved,
       },
     ];
-    if (config.step === 6 || config.step === 7) {
+    if (config.step === 6 || config.step === 7 || config.step === 8) {
       const { decide, RULE_IDS } = await import('./decider.mjs');
       const { checkDecider } = await import('../scripts/decider-test.mjs');
       const localChecks = await checkDecider({ decide, ruleIds: RULE_IDS });
       const labels = [
         ['registered_device_read_local', '가상 등록 기기의 자료실 읽기는 허용'],
         ['unregistered_device_read_local', '가상 미등록 기기의 자료실 읽기는 device_not_registered로 거부'],
-        ...(config.step === 7 ? [
+        ...(config.step >= 7 ? [
           ['suspicious_step_up_local', '엔진 가상 복합 이상 사건은 추가 인증 전 step_up_required'],
           ['suspicious_reauthenticated_local', '새 로그인 시각을 엔진이 확인한 뒤 가상 요청을 재판정하여 허용'],
         ] : []),
@@ -180,6 +180,46 @@ export async function runAttackChecks(config) {
             : '로컬 판정기 가상 요청 연습 실패: ' + (check?.name || '확인 불가'),
         });
       }
+    }
+    if (config.step === 8) {
+      const { ANNOUNCEMENT_ID, exactRoute, verifiedInstructor } = await import('./resource-zones.mjs');
+      const validNoteRoute = exactRoute({
+        url: '/api/notes/00000000-0000-4000-8000-000000000001',
+      }, 'notes')?.type === 'item';
+      const protectedNotice = exactRoute({
+        url: '/api/notes/' + ANNOUNCEMENT_ID,
+      }, 'notes') === null;
+      const exportRejected = exactRoute({ url: '/api/notes/export' }, 'notes') === null;
+      const fakeUserId = '11111111-1111-4111-8111-111111111111';
+      const spoofedStudent = { kind: 'student', userId: fakeUserId };
+      const mockedAdmin = { auth: { admin: { getUserById: async () => ({
+        data: { user: { id: fakeUserId,
+          app_metadata: { vault_role: 'student' },
+          user_metadata: { vault_role: 'instructor' } } },
+        error: null,
+      }) } } };
+      const spoofedInstructorRejected = !(await verifiedInstructor(spoofedStudent, mockedAdmin));
+      attempts.push({
+        attackId: 'resource_zone_path_local',
+        expected: '자기 메모와 공지의 정확한 자원 경로를 구분하고 export 별칭을 거부',
+        observed: validNoteRoute && protectedNotice && exportRejected
+          ? '로컬 자원 경로 검증 통과; 기존 메모·강사 공지 UUID 구분 및 export 차단'
+          : '로컬 자원 경로 검증 실패',
+      });
+      attempts.push({
+        attackId: 'student_role_spoof_local',
+        expected: '사용자가 꾸민 강사 역할은 서버의 관리자 메타데이터가 아니므로 거부',
+        observed: spoofedInstructorRejected
+          ? '모의 서버 역할 검사 통과; 사용자 제공 강사 역할 거부'
+          : '모의 서버 역할 검사 실패',
+      });
+      // Production checks without a second account or instructor credentials
+      // are not evidence of a cross-owner database access trial.
+      attempts.push({
+        attackId: 'cross_owner_api_live',
+        expected: '실제 다른 계정의 단건·목록·수정 API가 소유자 검사로 거부',
+        observed: '미실행: 다른 계정의 비밀값 없이 운영 DB 교차 계정 요청은 수행하지 않음',
+      });
     }
     return attempts;
   }

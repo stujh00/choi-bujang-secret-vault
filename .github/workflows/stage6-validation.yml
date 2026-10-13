@@ -1,4 +1,4 @@
-name: Stage 7 step-up policy checks
+name: Stage 8 resource boundary checks
 
 on:
   push:
@@ -12,6 +12,13 @@ on:
       - 'aleph.config.json'
       - 'test/r5.test.mjs'
       - 'test/decider-stage7.test.mjs'
+      - 'test/zone-stage8.test.mjs'
+      - 'src/resource-zones.mjs'
+      - 'src/announcement-api.mjs'
+      - 'api/notes.js'
+      - 'api/notes/[id].js'
+      - 'api/announcements.js'
+      - 'api/announcements/[id].js'
       - 'package.json'
       - '.github/workflows/stage6-validation.yml'
   workflow_dispatch:
@@ -43,13 +50,13 @@ jobs:
         run: npm run build -- --local
       - name: Prepare ignored submission explanation (not committed)
         run: |
-          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"7단계: 검증된 등록 기기 규칙을 유지하면서 엔진이 제공한 가상 복합 이상 접속에 step_up_required를 적용했습니다. 최근 재인증이 검증되지 않으면 step_up, 확인 후 자료실 GET 읽기만 허용합니다. 실서비스 재로그인은 검증하지 않았으며 이전 보안 기능을 유지합니다.", blockedAt:null}, null, 2) + "\n")'
+          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"8단계: 메모 UUID와 공지 UUID를 구별하고 검증된 사용자 ID에 묶인 owner_id로 메모를 필터링합니다. 공지 변경은 Supabase Auth 관리자 메타데이터의 강사 권한을 확인합니다. 판정기에는 소유자 정보가 없으므로 수정은 기본 거부하며, 운영 DB 교차 계정 시험은 미실행입니다.", blockedAt:null}, null, 2) + "\n")'
       - name: Create ignored submission bundle from this checked-out commit
         run: npm run bundle
       - name: Archive sanitized submission metadata
         uses: actions/upload-artifact@v4
         with:
-          name: stage7-submission
+          name: stage8-submission
           path: artifacts/submission.json
           retention-days: 7
       - name: Summarize without printing private responses

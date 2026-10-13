@@ -35,6 +35,7 @@ test('build identity uses Vercel Git and deployment metadata', () => {
   assert.equal(deploymentIdentity(env, { ...config, step: 5 }).step, 5);
   assert.equal(deploymentIdentity(env, { ...config, step: 6 }).step, 6);
   assert.equal(deploymentIdentity(env, { ...config, step: 7 }).step, 7);
+  assert.equal(deploymentIdentity(env, { ...config, step: 8 }).step, 8);
 });
 
 test('first attack check reads public data.json without credentials', async () => {
@@ -212,4 +213,32 @@ test('seventh attack self-check reports mock step-up before and after engine-ver
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('eighth attack self-check distinguishes resources and marks live cross-user check unexecuted', async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const path = new URL(String(url)).pathname;
+    calls.push([path, options.method ?? 'GET']);
+    if (path === '/data.json') return Response.json({ notes: [] });
+    if (path === '/') return new Response('<main>자료실</main>', { status: 200 });
+    if (path === '/aleph.json') return Response.json({ step: 8 });
+    if (path === '/rest/v1/vault_notes') return new Response(null, { status: 403 });
+    throw new Error('unexpected stage 8 URL');
+  };
+  try {
+    const out = await runAttackChecks({
+      ...config, step: 8,
+      originalApiUrl: 'https://student.supabase.co/rest/v1/vault_notes',
+    });
+    assert.equal(out.length, 10);
+    assert.deepEqual(out.slice(-3).map(row => row.attackId), [
+      'resource_zone_path_local', 'student_role_spoof_local', 'cross_owner_api_live',
+    ]);
+    assert.ok(out[7].observed.includes('검증 통과'));
+    assert.ok(out[8].observed.includes('검사 통과'));
+    assert.match(out[9].observed, /미실행/u);
+    assert.deepEqual(calls.map(c => c[1]),['GET','GET','GET','GET','PATCH']);
+  } finally { globalThis.fetch = originalFetch; }
 });

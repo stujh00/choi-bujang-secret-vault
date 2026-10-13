@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { ANNOUNCEMENT_ID, exactRoute, validNotePayload, isNoteId } from '../src/resource-zones.mjs';
 import { readSessionCookie, requestOriginAllowed } from '../src/auth-session.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 
@@ -53,22 +54,24 @@ export default async function handler(request, response) {
 
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(url, secretKey);
-  const requestUrl = new URL(request.url, 'https://local.invalid');
-  const pathname = requestUrl.pathname;
-  const noteId = pathname.startsWith('/api/notes/') ? pathname.slice('/api/notes/'.length) : null;
+  const route = exactRoute(request, 'notes');
+  if (!route) return response.status(404).json({ error: 'RESOURCE_NOT_FOUND' });
+  const pathname = new URL(request.url, 'https://local.invalid').pathname;
+  const noteId = route.type === 'item' ? route.id : null;
 
   if (request.method === 'GET' && pathname === '/api/notes') {
     const { data, error } = await supabase
       .from('vault_notes')
-      .select('id,title,content')
+      .select('id,title,content,owner_id')
       .eq('owner_id', login.userId)
+      .neq('id', ANNOUNCEMENT_ID)
       .order('created_at', { ascending: true });
 
     if (error) {
       return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
     }
 
-    return response.status(200).json(data.map(normalizeNote));
+    return response.status(200).json(data.filter(row => row.owner_id === login.userId).map(normalizeNote));
   }
 
   if (request.method === 'GET' && noteId) {
@@ -95,12 +98,12 @@ export default async function handler(request, response) {
     } catch {
       return response.status(400).json({ error: 'INVALID_BODY' });
     }
-    if (!payload || typeof payload.title !== 'string' || typeof payload.body !== 'string') {
+    if (!validNotePayload(payload)) {
       return response.status(400).json({ error: 'INVALID_BODY' });
     }
 
     const rawId = typeof payload.id === 'string' ? payload.id : '';
-    if (rawId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(rawId)) {
+    if (rawId && !isNoteId(rawId)) {
       return response.status(400).json({ error: 'INVALID_ID' });
     }
 
@@ -130,7 +133,7 @@ export default async function handler(request, response) {
     } catch {
       return response.status(400).json({ error: 'INVALID_BODY' });
     }
-    if (!payload || typeof payload.title !== 'string' || typeof payload.body !== 'string') {
+    if (!validNotePayload(payload)) {
       return response.status(400).json({ error: 'INVALID_BODY' });
     }
 

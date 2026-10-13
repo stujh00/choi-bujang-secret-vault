@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { exactRoute, validNotePayload } from '../../src/resource-zones.mjs';
 import { readSessionCookie, requestOriginAllowed } from '../../src/auth-session.mjs';
 import { createLoginVerifier } from '../../src/verify-login.mjs';
 
@@ -46,7 +47,8 @@ export default async function handler(request, response) {
 
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(url, secretKey);
-  const noteId = request.query?.id || request.url?.split('/').filter(Boolean).at(-1) || null;
+  const resource = exactRoute(request, 'notes');
+  const noteId = resource?.type === 'item' ? resource.id : null;
 
   if (!noteId) {
     return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
@@ -76,7 +78,7 @@ export default async function handler(request, response) {
     } catch {
       return response.status(400).json({ error: 'INVALID_BODY' });
     }
-    if (!payload || typeof payload.title !== 'string' || typeof payload.body !== 'string') {
+    if (!validNotePayload(payload)) {
       return response.status(400).json({ error: 'INVALID_BODY' });
     }
 
