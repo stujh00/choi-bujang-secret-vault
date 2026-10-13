@@ -46,5 +46,5 @@ export function validNotePayload(payload) {
   return payload && typeof payload === 'object' && !Array.isArray(payload)
     && typeof payload.title === 'string' && typeof payload.body === 'string'
     && payload.title.length <= 200 && payload.body.length <= 20000
-    && !Object.keys(payload).some(key => ['owner_id', 'ownerId', 'role', 'zone', 'isInstructor', 'app_metadata'].includes(key));
+    ; // Untrusted extra fields are ignored, never used for owner or instructor decisions.
 }

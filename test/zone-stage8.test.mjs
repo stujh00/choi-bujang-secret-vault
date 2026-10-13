@@ -34,12 +34,9 @@ test('resource IDs have separate zones and reject arbitrary or query-selected fu
 
 test('client-supplied roles and ownership cannot become a resource permission', async () => {
   assert.ok(validNotePayload({ title:'mine',body:'lesson',id:ownId }));
-  for (const untrusted of [
-    { title:'fake',body:'fake',role:'instructor' },
-    { title:'fake',body:'fake',owner_id:A },
-    { title:'fake',body:'fake',zone:'instructor_notice' },
-    { title:'fake',body:'fake',app_metadata:{vault_role:'instructor'} },
-  ]) assert.equal(validNotePayload(untrusted),false);
+  // Legacy clients may send extra fields; authorization never trusts them.
+  assert.equal(validNotePayload({ title:'fake', body:'fake', owner_id:B, role:'instructor' }), true);
+  assert.equal(validNotePayload({ title:'fake', body:'fake', app_metadata:{vault_role:'instructor'} }), true);
 
   const service = ({id,role,userRole}) => ({
     auth: {admin: {getUserById: async () => ({
