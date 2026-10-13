@@ -16,7 +16,7 @@ const SAFE_REASONS = new Set([
   '반복 SQL Injection 의심',
   '반복 XSS 스크립트 삽입 표식',
   '반복 Path Traversal 의심',
-  '반복 명령 구분자 표식 (실행 징후 미확인)',
+  '반복 명령 주입 시도',
   '단일·모호한 주입 단서 추가 검토',
   '공격 관련 설명은 있으나 경로·반복·출발지 근거가 부족해 추가 검토가 필요합니다.',
   'T1190만으로는 주입 공격을 입증할 수 없습니다.',
@@ -29,6 +29,7 @@ const BLOCK_REASONS = new Set([
   '반복 SQL Injection 의심',
   '반복 XSS 스크립트 삽입 표식',
   '반복 Path Traversal 의심',
+  '반복 명령 주입 시도',
 ]);
 
 function parseTime(value) {

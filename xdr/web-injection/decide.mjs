@@ -65,20 +65,20 @@ const PATTERNS = [
     evidence: 'wi-03/07은 /files의 path/name 쿼리와 상위 경로 이탈 설명, 해당 경보 count 8건·14건이 함께 있습니다.',
   },
   {
-    name: '반복 명령 구분자 표식 (실행 징후 미확인)',
+    name: '반복 명령 주입 시도',
     mitre: ['T1190'],
-    classification: 'review_only',
+    classification: 'high_confidence_candidate',
     condition: {
       all: [
         { field: 'rule.mitre', operator: 'array_includes', value: 'T1190' },
         { field: 'data.srcip', operator: 'non_empty_string' },
         { field: 'data.url', operator: 'url_path_in', value: ['/notes'] },
         { field: 'data.url', operator: 'url_query_parameter_any', value: ['q'] },
-        { field: 'data.count', operator: 'numeric_string_gte', value: 2 },
+        { field: 'data.count', operator: 'numeric_string_gte', value: 8 },
         { field: 'rule.description', operator: 'contains_any', value: ['명령 구분자 표기가 연속 요청'] },
       ],
     },
-    evidence: 'wi-06은 명령 구분자 설명과 count 11이 있지만 실행 명령 징후는 확인되지 않아 Command Injection 확정이나 자동 차단 근거가 아닙니다.',
+    evidence: 'T1190, 유효 출발지, /notes?q 문맥, Wazuh의 구체적인 반복 명령 구분자 탐지 설명과 count 8 이상이 함께 있으면 반복 주입 시도 후보로 분류합니다. 이는 명령 실행 성공을 뜻하지 않습니다.',
   },
   {
     name: '단일·모호한 주입 단서 추가 검토',
