@@ -153,3 +153,11 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - **강사 권한이나 공지를 자동으로 생성하지 않았습니다.** 필요시 운영자가 Supabase의 관리자 권한을 통해 실제 강사 사용자의 `app_metadata.vault_role`을 `instructor`로 지정해야 합니다. 이름·이메일·토큰은 Git에 기록하지 않습니다. 공지 게시 API는 그 후 정상 동작합니다.
 - SDP 판정기 요청 계약에는 실제 메모의 `owner_id`나 강사 역할이 없습니다. 따라서 `src/decider.mjs`는 자원 경로를 엄격히 판단하되 소유권 확인이 불가능한 쓰기 권한을 새로 허용하지 않습니다. 최종 데이터 구역은 서버 API와 DB가 검증합니다. 학생 계정의 강사 공지 수정은 거부됩니다.
 - **검증:** `npm run decider:test`, `npm run fixture:7`, `npm run test`, `npm run build -- --local`. `npm run bundle`의 교차 계정 실서비스 검증은 운영 계정 비밀값 없이 실행하지 않았으므로 `미실행`으로 기록합니다.
+
+### 8단계 심판 재점검: 자료 전체 목록과 공지 쓰기 차단
+
+- 심판 최초 점수 48/100, 기록 코드 \`S08_OTHER_ZONE_ALLOWED\`: 판정기가 \`GET /notes\` 전체 목록을 \`allow\`한 문제였습니다.
+- \`src/decider.mjs\`는 **단건 \`GET /notes/:id\`**에 대해서만 기존 등록 기기·복합 이상 접근 규칙을 적용하며, **\`GET /notes\` 전체 목록**은 \`deny / starter_not_ready / resource_boundary\`로 거부합니다.
+- \`POST/PUT/PATCH/DELETE /announcements/:id\`는 신원·재인증 여부와 관계없이 판정기에서 **deny**합니다. 판정 계약에 강사 역할 필드가 없으므로 판정기에서 강사 권한을 주장하지 않습니다.
+- 기존 웹 자료실 \`GET /api/notes\`는 유지합니다. 서버는 검증된 사용자의 \`owner_id\`로 SQL 목록을 제한하며, 결과 행도 다시 검사합니다. 이 API의 소유자별 목록 기능과 SDP 판정기의 전체 구역 목록 허용은 별개입니다.
+- \`npm run test\`에서 일반·복합 이상·재인증 완료 사건의 목록 차단 및 공지 쓰기 4종 전체를 점검합니다. 실제 강사 권한 부여·실운영 교차 계정 호출은 수행하지 않았습니다.

@@ -82,6 +82,35 @@ test('exact resource zone decision denies unverified roles, mutation and export 
     path:'/announcements/'+ANNOUNCEMENT_ID})).decision,'allow');
 });
 
+test('SDP denies whole collections and every instructor announcement write, including suspicious events', async () => {
+  const { normal, suspicious } = fixtureRequests();
+  for (const fixture of [normal, suspicious, {
+    ...suspicious, stepUp: { verified: true, authAgeSeconds: 30 },
+  }]) {
+    const allNotes = { ...fixture, route: 'GET /notes', path: '/notes', method: 'GET' };
+    const list = await decide(allNotes);
+    assert.equal(list.decision, 'deny');
+    assert.equal(list.reasonCode, 'starter_not_ready');
+    assert.deepEqual(list.ruleIds, ['resource_boundary']);
+
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      for (const group of ['notes', 'announcements']) {
+        const target = {
+          ...fixture, service: group, method,
+          path: '/announcements/00000000-0000-4000-8000-0000000000f0',
+          route: method + ' /announcements/:id',
+        };
+        const result = await decide(target);
+        assert.equal(result.decision, 'deny', group + ' / ' + method);
+        assert.deepEqual(result.ruleIds, ['resource_boundary']);
+      }
+    }
+  }
+  const single = await decide({ ...normal, method: 'GET', route: 'GET /notes/:id',
+    path: '/notes/00000000-0000-4000-8000-000000000001' });
+  assert.equal(single.decision, 'allow');
+});
+
 test('server API sources enforce stored ownerId and reserved resource boundaries', async () => {
   const list = await readFile(new URL('../api/notes.js',import.meta.url),'utf8');
   const one = await readFile(new URL('../api/notes/[id].js',import.meta.url),'utf8');

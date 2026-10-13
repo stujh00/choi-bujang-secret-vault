@@ -63,16 +63,31 @@ export async function decide(request) {
     && request.route === 'GET /announcements/:id'
     && request.path === '/announcements/00000000-0000-4000-8000-0000000000f0';
   const readNotes = notesService && request.method === 'GET'
-    && ((request.route === 'GET /notes' && request.path === '/notes')
-      || (request.route === 'GET /notes/:id'
-        && typeof request.path === 'string'
-        && /^\/notes\/[^/?#]+$/.test(request.path)
-        && (exactNoteId || fixtureNote)));
+    && request.route === 'GET /notes/:id'
+    && typeof request.path === 'string'
+    && /^\/notes\/[^/?#]+$/.test(request.path)
+    && (exactNoteId || fixtureNote);
   const notesWrite = notesService && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)
     && typeof request.route === 'string'
     && request.route.startsWith(request.method + ' /notes')
     && typeof request.path === 'string'
     && /^\/notes(?:\/[^/?#]+)?$/.test(request.path);
+
+  // Stage 8: do not treat a whole notes collection as a single authorized resource.
+  // The API lists only owner-filtered notes; the SDP contract has no owner proof.
+  const wholeNotesList = notesService && request.method === 'GET'
+    && request.route === 'GET /notes' && request.path === '/notes';
+  const announcementMutation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request?.method)
+    && typeof request?.path === 'string'
+    && /^\/announcements(?:\/|$)/.test(request.path);
+  if (wholeNotesList || announcementMutation) {
+    return {
+      ...base,
+      decision: 'deny',
+      reasonCode: 'starter_not_ready',
+      ruleIds: ['resource_boundary'],
+    };
+  }
 
   // Stage 7: suspicious synthetic requests require engine-verified fresh login.
   // Even after reauthentication, writes are not enabled by the stage 6 read rule.
