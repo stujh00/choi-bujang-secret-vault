@@ -238,6 +238,63 @@ function hasTechnique(alert) {
   return Array.isArray(mitre) && mitre.includes('T1190');
 }
 
+
+// Broader Wazuh evidence: support different descriptions and real injection payloads,
+// while requiring repeated attempts before an automatic block.
+function analyzeWebEvidence(alert) {
+  const description = readField(alert, 'rule.description');
+  const url = readField(alert, 'data.url');
+  const count = parseCount(readField(alert, 'data.count'));
+  const ip = readField(alert, 'data.srcip');
+  const tagged = hasTechnique(alert);
+  if (typeof description !== 'string' || typeof url !== 'string') return null;
+
+  const urlObject = parseAlertUrl(url);
+  const rawWebUrl = /^\/[\w~!function decideSafely(alert) {'()*+,;=:@%./?\-]{1,4096}$/.test(url)
+    || (/^https?:\/\//i.test(url) && url.length <= 4096);
+  if (!urlObject && !rawWebUrl) return null;
+
+  const queryPart = url.includes('?') ? url.slice(url.indexOf('?') + 1).split('#', 1)[0] : '';
+  let query = queryPart;
+  try { query = decodeURIComponent(queryPart.replace(/\+/g, ' ')); } catch { /* no repeated decoding */ }
+  const context = url.split('?', 1)[0] + '?' + query;
+  const benignContext = /(?:수업|강의|공지|정상|아닙니다|없습니다|단순|설명)/i.test(description);
+  const clues = [
+    {
+      name: '반복 SQL Injection 의심',
+      description: /(?:SQL|데이터베이스|DB).*?(?:구문|표식|이어|결합|붙이|주입|삽입|인젝션|injection|공격|조작)/i.test(description)
+        || /(?:SQL\s*injection|SQLi|쿼리\s*(?:조작|주입))/i.test(description),
+      payload: /\bunion\s+(?:all\s+)?select\b|\binformation_schema\b|\b(?:sleep|benchmark)\s*\(|['"]\s*(?:or|and)\s+\d+\s*=\s*\d+|\bdrop\s+table\b/i.test(context),
+    },
+    {
+      name: '반복 XSS 스크립트 삽입 표식',
+      description: /(?:XSS|스크립트|script|javascript).*?(?:삽입|표식|주입|실행|태그|injection|attack|payload)/i.test(description),
+      payload: /<script\b|<img\b[^>]*\bonerror\s*=|\bon(?:error|load|click)\s*=|javascript\s*:/i.test(context),
+    },
+    {
+      name: '반복 Path Traversal 의심',
+      description: /경로.*?(?:이탈|거슬러|상위|탐색)|(?:path|directory)\s+traversal/i.test(description),
+      payload: /(?:\.\.\/){2,}|\.\.\/(?:etc|windows|system32|var|home)\b|(?:\.\.\\){2,}/i.test(context),
+    },
+    {
+      name: '반복 명령 주입 시도',
+      description: /명령.*?(?:구분자|주입|실행)|(?:command|shell)\s+injection/i.test(description),
+      payload: /(?:;|&&|\|\|?|%3b)\s*(?:id|whoami|uname|cat|curl|wget|bash|sh|powershell|cmd)(?:\b|\/)/i.test(context),
+    },
+  ];
+
+  const suspicious = clues.find((clue) => clue.payload || (clue.description && !benignContext));
+  const requestHasInput = Boolean(queryPart) || clues.some((clue) => clue.payload);
+  if (suspicious && tagged && isValidIp(ip) && requestHasInput
+      && count !== null && count >= 5) {
+    return result(0.9, suspicious.name);
+  }
+  if ((tagged || clues.some((clue) => clue.payload)) && isValidIp(ip) && requestHasInput) {
+    return result(0.65, '단일·모호한 주입 단서 추가 검토');
+  }
+  return null;
+}
+
 function decideSafely(alert) {
   if (alert === null || typeof alert !== 'object' || Array.isArray(alert)) {
     return result(0.1, '경보 객체가 아니어서 판단 근거가 없습니다.');
@@ -250,6 +307,9 @@ function decideSafely(alert) {
       pattern.name,
     );
   }
+
+  const broader = analyzeWebEvidence(alert);
+  if (broader) return broader;
 
   const description = readField(alert, 'rule.description');
   const hasSuspiciousDescription = typeof description === 'string'
