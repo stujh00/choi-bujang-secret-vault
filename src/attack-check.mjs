@@ -10,7 +10,7 @@ async function fetchText(url, options = {}) {
 }
 
 export async function runAttackChecks(config) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -80,7 +80,7 @@ export async function runAttackChecks(config) {
     ];
   }
 
-  if (config.step === 5 || config.step === 6 || config.step === 7 || config.step === 8 || config.step === 9) {
+  if (config.step >= 5 && config.step <= 10) {
     const { response: pageResponse, text: pageText } = await fetchText(new URL('/', app));
     const { response: identityResponse, text: identityText } = await fetchText(new URL('/aleph.json', app));
     const anonKey = pageText.match(/\bsb_publishable_[A-Za-z0-9_-]{8,}\b/u)?.[0];
@@ -158,7 +158,7 @@ export async function runAttackChecks(config) {
         observed: sourceUpdateObserved,
       },
     ];
-    if (config.step === 6 || config.step === 7 || config.step === 8 || config.step === 9) {
+    if (config.step >= 6 && config.step <= 10) {
       const { decide, RULE_IDS } = await import('./decider.mjs');
       const { checkDecider } = await import('../scripts/decider-test.mjs');
       const localChecks = await checkDecider({ decide, ruleIds: RULE_IDS });
@@ -181,7 +181,7 @@ export async function runAttackChecks(config) {
         });
       }
     }
-    if (config.step === 8 || config.step === 9) {
+    if (config.step >= 8 && config.step <= 10) {
       const { ANNOUNCEMENT_ID, exactRoute, verifiedInstructor } = await import('./resource-zones.mjs');
       const validNoteRoute = exactRoute({
         url: '/api/notes/00000000-0000-4000-8000-000000000001',
@@ -221,7 +221,7 @@ export async function runAttackChecks(config) {
         observed: '미실행: 다른 계정의 비밀값 없이 운영 DB 교차 계정 요청은 수행하지 않음',
       });
     }
-    if (config.step === 9) {
+    if (config.step >= 9 && config.step <= 10) {
       const { detect } = await import('./detect.mjs');
       const { checkDetection } = await import('../scripts/detect-test.mjs');
       const localChecks = await checkDetection(detect);
@@ -245,6 +245,26 @@ export async function runAttackChecks(config) {
       }
       // No device ID is included in docs/DETECT_EVENTS.md. This does not
       // claim to revoke a real session or measure a real response time.
+    }
+    if (config.step === 10) {
+      const { TEST_B_NOTE_ID } = await import('./restore-note.mjs');
+      attempts.push({
+        attackId:'verified_b_backup_database',
+        expected:'B 시험 메모 원본 1건의 비공개 백업·해시·소유자 검증',
+        observed:'사전 Supabase SQL 확인: 백업 1건, 해시 일치, 원본과 일치; 실제 변조·삭제 복원 시험은 미실행',
+      });
+      attempts.push({
+        attackId:'restore_route_auth_local',
+        expected:'POST /api/restore는 심판 B JWT만 사용하며 다른 대상·일반 사용자 요청은 거부',
+        observed:config.restoreRoute === '/api/restore' && TEST_B_NOTE_ID.endsWith('0005')
+          ? '로컬 경로와 고정 대상 검사 준비; 운영 심판 호출은 미실행'
+          : '복구 경로 또는 대상 검사 실패',
+      });
+      attempts.push({
+        attackId:'post_restore_regression_unexecuted',
+        expected:'실제 복원 이후 1~9단계 정상·공격 요청 재시험',
+        observed:'미실행: 아직 심판의 변조·삭제 및 복원 호출이 없어 사후 운영 재시험 불가',
+      });
     }
     return attempts;
   }

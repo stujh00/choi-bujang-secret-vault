@@ -1,4 +1,4 @@
-name: Stage 9 verified-event detector checks
+name: Stage 10 verified recovery checks
 
 on:
   push:
@@ -14,6 +14,10 @@ on:
       - 'test/decider-stage7.test.mjs'
       - 'test/zone-stage8.test.mjs'
       - 'test/detect-stage9.test.mjs'
+      - 'test/restore-stage10.test.mjs'
+      - 'src/restore-note.mjs'
+      - 'api/restore.js'
+      - 'supabase/stage10-verified-backup.sql'
       - 'src/detect.mjs'
       - 'docs/DETECT_EVENTS.md'
       - 'scripts/detect-test.mjs'
@@ -52,17 +56,19 @@ jobs:
         run: npm run detect:test
       - name: Run existing project regression tests
         run: npm run test
+      - name: Validate stage 10 restore authentication and failure handling
+        run: node --test test/restore-stage10.test.mjs
       - name: Build static files without deployment
         run: npm run build -- --local
       - name: Prepare ignored submission explanation (not committed)
         run: |
-          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"9단계: docs/DETECT_EVENTS.md 계약에 따라 같은 가명 주체의 10분 내 GET 121건 이상에서만 burst_read 신원 회수 제안을 반환합니다. 정상 기기와 다른 주체의 사건은 합산하지 않으며, 기기 ID나 네트워크 정보가 없어 실제 기기·세션 회수와 시간 측정은 심판 엔진에서만 가능합니다.", blockedAt:null}, null, 2) + "\n")'
+          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"10단계: 검증된 B 가상 메모 1건을 DB 비공개 스냅샷에 해시 확인 후 보존했습니다. POST /api/restore는 심판 B로 검증된 인증만 허용하며 DB 함수가 오직 ID 0005만 복원하고 감사 로그를 추가합니다. 실제 변조·삭제 복원은 심판 미실행입니다.", blockedAt:null}, null, 2) + "\n")'
       - name: Create ignored submission bundle from this checked-out commit
         run: npm run bundle
       - name: Archive sanitized submission metadata
         uses: actions/upload-artifact@v4
         with:
-          name: stage9-submission
+          name: stage10-submission
           path: artifacts/submission.json
           retention-days: 7
       - name: Summarize without printing private responses

@@ -171,3 +171,11 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - **실제 회수 API, 세션 변경, 회수 경과 시간 측정은 수행하지 않습니다.** 엔진이 실이벤트를 인증해 전달하고 제안을 집행하는 부분은 제공 엔진/심판의 영역이며 `src/decider.mjs`의 5개 항목 응답 형식은 그대로 유지했습니다.
 - 확인: `npm run detect:test` (기본 6건), `npm run test` (경계/다중 사용자/입력 검증), `npm run decider:test`, `npm run fixture:7`, `npm run build -- --local`. 제출용 `npm run bundle`은 커밋 후 GitHub Actions에서 돌리며 가상 탐지 기록과 미실행 운영 회수를 구별합니다.
 
+## 10단계 저장점: 시험 B 메모의 검증된 사본 복원
+
+- 10단계 전 Supabase에서 B 시험 메모 UUID `00000000-0000-4000-8000-000000000005`가 기존 4단계 원본 제목·내용과 일치하며 owner_id가 존재함을 직접 확인했습니다.
+- 비공개 `vault_recovery_snapshots`에 B 한 건만 저장했고 무결성 SHA-256, 현재 원본과 일치, anon/authenticated의 복구 RPC 실행 불가를 확인했습니다. 감사 이력은 별도 보존합니다.
+- `POST /api/restore`는 발급자·서명을 검증한 심판 B 신원만 허용하고 일반 사용자·심판 A·다른 대상 ID는 거부합니다. DB 함수 `restore_test_note_b`는 사본의 소유자/해시를 확인해 오직 B 메모 하나만 복원하고 감사 행을 덧붙입니다.
+- 기존 다른 메모, 현재 1~9단계 정책, 감사 기록은 자동 덮어쓰지 않습니다. 변경된 시험 정책을 복원할 별도 사전 검증 사본은 없어 정책 자동 원복은 **미실행**으로 남깁니다.
+- **복구 이후 확인 순서:** 복구 B 메모 ID·소유자·해시 검사 → B 정상 메모 GET → A의 B 메모 GET/PUT 거부 → 미등록 기기 거부(`npm run decider:test`) → 복합 이상 접속(`npm run fixture:7`) → 폭주 탐지(`npm run detect:test`) → 전체 테스트(`npm run test`). 실제 심판 변조·삭제/사후 재시험은 아직 **미실행**입니다.
+- 실행: `npm run test`, `npm run build -- --local`, 커밋 후 `npm run bundle`. 서버 경로 `https://choi-bujang-secret-vault-six-zeta.vercel.app/api/restore`는 심판의 인증된 POST 전용입니다.
