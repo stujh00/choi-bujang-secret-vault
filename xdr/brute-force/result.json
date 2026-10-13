@@ -1,0 +1,179 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "brute-force",
+  "decisions": [
+    {
+      "alertId": "bf-01",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 고빈도 실패와 구체적인 공격 징후"
+    },
+    {
+      "alertId": "bf-02",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 한 출발 IP의 다계정 실패 시도"
+    },
+    {
+      "alertId": "bf-03",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 한 출발 IP의 다계정 실패 시도"
+    },
+    {
+      "alertId": "bf-04",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 한 출발 IP의 동일 계정 고빈도 실패"
+    },
+    {
+      "alertId": "bf-05",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 한 출발 IP의 다계정 실패 시도"
+    },
+    {
+      "alertId": "bf-06",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 고빈도 실패와 구체적인 공격 징후"
+    },
+    {
+      "alertId": "bf-07",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 고빈도 실패와 구체적인 공격 징후"
+    },
+    {
+      "alertId": "bf-08",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 한 출발 IP의 동일 계정 고빈도 실패"
+    },
+    {
+      "alertId": "bf-09",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 한 출발 IP의 다계정 실패 시도"
+    },
+    {
+      "alertId": "bf-10",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "고신뢰 의심: 고빈도 실패와 구체적인 공격 징후"
+    },
+    {
+      "alertId": "bf-11",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-12",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-13",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-14",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-15",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-16",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-17",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-18",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-19",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "검토 필요: 저빈도 또는 맥락이 필요한 실패"
+    },
+    {
+      "alertId": "bf-20",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-21",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-22",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-23",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-24",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-25",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-26",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-27",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    },
+    {
+      "alertId": "bf-28",
+      "action": "record",
+      "confidence": 0.1,
+      "reason": "T1110 또는 반복 실패 근거가 없습니다."
+    }
+  ],
+  "counts": {
+    "block": 10,
+    "alert": 9,
+    "record": 9
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "brute-force",
+  "mitreTechnique": {
+    "id": "T1110",
+    "name": "Brute Force"
+  },
+  "evaluationScope": "각 조건은 외부 상태나 다른 경보 없이 단일 alert 객체만으로 평가합니다.",
+  "conditionSemantics": {
+    "all": "배열의 모든 조건을 만족해야 합니다.",
+    "any": "배열의 조건 중 하나 이상을 만족해야 합니다.",
+    "array_includes": "배열 필드가 지정 값을 포함합니다.",
+    "non_empty_string": "문자열 필드가 존재하고 공백이 아닙니다.",
+    "numeric_string_gte": "문자열을 숫자로 변환할 수 있고 지정값 이상입니다.",
+    "numeric_string_between": "문자열을 숫자로 변환할 수 있고 양 끝값을 포함한 범위 안입니다.",
+    "contains_any": "문자열에 지정된 부분 문자열 중 하나 이상이 포함됩니다.",
+    "comma_separated_count_gte": "쉼표로 구분한 비어 있지 않은 항목 수가 지정값 이상입니다."
+  },
+  "patterns": [
+    {
+      "name": "한 출발 IP의 동일 계정 고빈도 실패",
+      "mitreTechnique": "T1110",
+      "classification": "high_confidence_suspicious",
+      "condition": {
+        "all": [
+          { "field": "rule.mitre", "operator": "array_includes", "value": "T1110" },
+          { "field": "data.srcip", "operator": "non_empty_string" },
+          { "field": "data.srcuser", "operator": "non_empty_string" },
+          { "field": "data.count", "operator": "numeric_string_gte", "value": 15 },
+          { "field": "rule.description", "operator": "contains_any", "value": ["한 계정", "같은 계정"] }
+        ]
+      },
+      "evidence": "bf-04와 bf-08은 T1110, srcip/srcuser가 있고 같은 계정의 실패를 각각 52건과 70건으로 명시합니다; 애매한 T1110 사례의 count는 최대 8입니다."
+    },
+    {
+      "name": "한 출발 IP의 다계정 실패 시도",
+      "mitreTechnique": "T1110",
+      "classification": "high_confidence_suspicious",
+      "condition": {
+        "all": [
+          { "field": "rule.mitre", "operator": "array_includes", "value": "T1110" },
+          { "field": "data.srcip", "operator": "non_empty_string" },
+          {
+            "any": [
+              { "field": "data.accounts", "operator": "comma_separated_count_gte", "value": 2 },
+              {
+                "field": "rule.description",
+                "operator": "contains_any",
+                "value": ["이름을 바꿔 가며 시도", "계정 20개", "서로 다른 계정 15개"]
+              }
+            ]
+          }
+        ]
+      },
+      "evidence": "bf-02는 accounts에 8개 계정이 있고 bf-03/bf-05/bf-09는 여러 계정 시도를 설명합니다; 공통 비밀번호 사용 여부를 검증하는 필드는 없습니다."
+    },
+    {
+      "name": "저빈도 또는 맥락이 필요한 실패",
+      "mitreTechnique": "T1110",
+      "classification": "review_only",
+      "condition": {
+        "all": [
+          { "field": "rule.mitre", "operator": "array_includes", "value": "T1110" },
+          { "field": "data.srcip", "operator": "non_empty_string" },
+          { "field": "data.srcuser", "operator": "non_empty_string" },
+          { "field": "data.count", "operator": "numeric_string_between", "value": [3, 8] }
+        ]
+      },
+      "evidence": "bf-11~bf-19의 T1110 count는 3~8이며 성공 동반, 비정상 주소, 비밀번호 변경, 두 계정, 불규칙 간격 또는 잠금 후 시도 등 추가 맥락이 있습니다."
+    }
+  ],
+  "triageGuidance": {
+    "normal": "이 fixture의 bf-20~bf-28은 rule.mitre가 빈 배열이며 일반 로그인·로그아웃·세션·화면 동작입니다; bf-22의 count='1'도 T1110이 없어 공격 패턴으로 보지 않습니다.",
+    "decisionNote": "rule.level만으로 차단하지 않습니다. 고신뢰 패턴도 의심 신호이며, 비밀번호가 같다는 설명만으로 Password Spraying을 확정하지 않습니다."
+  }
+}
