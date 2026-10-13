@@ -16,6 +16,7 @@ export default async function handler(request, response) {
   const supabase = createClient(url,secretKey,{auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false}});
   return restoreAuthorizedTestNote(request,response,{
     verifyAuthorization,
+    verifyBackup:()=>supabase.rpc('verify_test_note_b_backup'),
     restoreFromBackup:()=>supabase.rpc('restore_test_note_b'),
   });
 }

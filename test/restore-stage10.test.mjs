@@ -20,9 +20,10 @@ async function call(overrides={},options={}) {
   ...overrides,
  },state.res,{
   verifyAuthorization:options.verifyAuthorization ?? (async()=>access),
+  verifyBackup:async()=>{verifiedCount++;return options.verification ?? {data:{verified:true,noteId:TEST_B_NOTE_ID,ownerVerified:true,contentSha256:hash}};},
   restoreFromBackup:async()=>{count++;return options.result ?? reply;},
  });
- return {...state,count};
+ return {...state,count,verifiedCount};
 }
 test('verified judge B may restore exactly one matching private backup',async()=>{
  const done=await call();
@@ -53,4 +54,20 @@ test('backup unavailable or invalid hash is fail closed',async()=>{
  for(const result of [{error:{message:'missing'}},{data:{...reply.data,contentSha256:'bad'}},{data:{...reply.data,ownerVerified:false}}]){
   const done=await call({}, {result});assert.equal(done.statusCode,503);
  }
+});
+
+test('unverified or mismatched backup always prevents any restore call',async()=>{
+ for(const verification of [
+   {error:{message:'no backup'}},
+   {data:{verified:false,noteId:TEST_B_NOTE_ID,ownerVerified:true,contentSha256:hash}},
+   {data:{verified:true,noteId:'00000000-0000-4000-8000-000000000001',ownerVerified:true,contentSha256:hash}},
+   {data:{verified:true,noteId:TEST_B_NOTE_ID,ownerVerified:false,contentSha256:hash}},
+ ]) {
+   const done=await call({}, {verification});
+   assert.equal(done.statusCode,503);
+   assert.equal(done.count,0);
+   assert.equal(done.verifiedCount,1);
+ }
+ const mismatch=await call({}, {result:{data:{...reply.data,contentSha256:'b'.repeat(64)}}});
+ assert.equal(mismatch.statusCode,503);
 });

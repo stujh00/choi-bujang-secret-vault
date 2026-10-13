@@ -179,3 +179,10 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - 기존 다른 메모, 현재 1~9단계 정책, 감사 기록은 자동 덮어쓰지 않습니다. 변경된 시험 정책을 복원할 별도 사전 검증 사본은 없어 정책 자동 원복은 **미실행**으로 남깁니다.
 - **복구 이후 확인 순서:** 복구 B 메모 ID·소유자·해시 검사 → B 정상 메모 GET → A의 B 메모 GET/PUT 거부 → 미등록 기기 거부(`npm run decider:test`) → 복합 이상 접속(`npm run fixture:7`) → 폭주 탐지(`npm run detect:test`) → 전체 테스트(`npm run test`). 실제 심판 변조·삭제/사후 재시험은 아직 **미실행**입니다.
 - 실행: `npm run test`, `npm run build -- --local`, 커밋 후 `npm run bundle`. 서버 경로 `https://choi-bujang-secret-vault-six-zeta.vercel.app/api/restore`는 심판의 인증된 POST 전용입니다.
+
+
+### 10단계 백업 재검증 보완 (S10_BACKUP_UNVERIFIED)
+
+- 검증용 read-only RPC `verify_test_note_b_backup()`를 Supabase에 별도로 설치했습니다. 복원 전 비공개 백업의 기준 원본 내용·소유자·해시를 다시 읽고 확인합니다.
+- API는 `POST /api/restore`에서 심판 B JWT를 먼저 확인한 뒤 검증 RPC를 호출하며, 실패·누락·해시 형식 불일치 시 복원 RPC를 호출하지 않고 HTTP 503을 반환합니다.
+- 복원 DB 함수도 같은 검증을 트랜잭션 안에서 다시 수행하고 해시가 다르면 변경 없이 중단합니다. 변조/삭제 사후 복원 테스트는 심판이 실행하기 전까지 미실행으로 기록합니다.
