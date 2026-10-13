@@ -37,6 +37,7 @@ export async function decide(request) {
     };
   }
   // Unrelated paths and methods are outside this stage's one new allow rule.
+  // Retain the original starter.deny fallback for later policy stages.
   return {
     ...base,
     decision: 'deny',
