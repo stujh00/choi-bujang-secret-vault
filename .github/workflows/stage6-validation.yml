@@ -11,6 +11,7 @@ on:
       - 'scripts/deployment-identity.mjs'
       - 'aleph.config.json'
       - 'test/r5.test.mjs'
+      - 'test/package-starter.test.mjs'
       - 'test/decider-stage7.test.mjs'
       - 'test/zone-stage8.test.mjs'
       - 'test/detect-stage9.test.mjs'
