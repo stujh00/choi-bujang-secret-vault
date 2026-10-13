@@ -4,14 +4,15 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-public.mjs",
-    "test": "node --test test/auth.test.mjs test/package-starter.test.mjs test/r5.test.mjs test/xdr-run.test.mjs test/decider-stage7.test.mjs test/zone-stage8.test.mjs test/detect-stage9.test.mjs test/restore-stage10.test.mjs",
+    "test": "node --test test/auth.test.mjs test/package-starter.test.mjs test/r5.test.mjs test/xdr-run.test.mjs test/decider-stage7.test.mjs test/zone-stage8.test.mjs test/detect-stage9.test.mjs test/restore-stage10.test.mjs test/stage10-policy-preview.test.mjs test/stage10-policy-restore.test.mjs",
     "test:r5": "node --test test/r5.test.mjs",
     "test:package": "node --test test/package-starter.test.mjs",
     "bundle": "node scripts/bundle.mjs",
     "decider:test": "node scripts/decider-test.mjs",
     "detect:test": "node scripts/detect-test.mjs",
     "fixture:7": "node scripts/fixture-7.mjs",
-    "xdr:run": "node scripts/xdr-run.mjs"
+    "xdr:run": "node scripts/xdr-run.mjs",
+    "policy:preview": "node scripts/stage10-policy-preview.mjs"
   },
   "engines": {
     "node": ">=22"
