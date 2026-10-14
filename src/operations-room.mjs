@@ -6,7 +6,45 @@ import { fixtureRequests } from '../scripts/fixture-7.mjs';
 import { getOperations } from './restore-state.mjs';
 
 // Only allowlisted metadata is returned. No runtime audit identities or note bodies.
-export async function operationsReport() {
+async function measuredLiveChecks({enabled, fetchImpl}) {
+  const probes = [
+    ['anonymous_notes_live', '/api/notes', 401],
+    ['public_static_data_live', '/data.json', 200],
+  ];
+  const unavailable = (name, expected) => ({
+    name, scope:'live_api', status:'not_run', expected:'HTTP '+expected,
+    actual:null, passed:null, requestId:null, checkedAt:null,
+  });
+  if (!enabled) return probes.map(([name,,expected])=>unavailable(name,expected));
+  let base;
+  try {
+    const config=JSON.parse(await readFile(new URL('../aleph.config.json',import.meta.url),'utf8'));
+    base=new URL(config.publicAppUrl);
+    if (base.protocol!=='https:' || !base.hostname.endsWith('.vercel.app')
+        || base.pathname!=='/' || base.username || base.password || base.search || base.hash) {
+      throw new Error('invalid configured public app URL');
+    }
+  } catch {
+    return probes.map(([name,,expected])=>unavailable(name,expected));
+  }
+  return Promise.all(probes.map(async ([name,path,expected])=>{
+    const requestId=randomUUID(),checkedAt=new Date().toISOString();
+    try {
+      // Unauthenticated GET: do not forward browser cookies, API keys or tokens.
+      const response=await fetchImpl(new URL(path+'?operationCheckId='+requestId,base),{
+        method:'GET', redirect:'error', cache:'no-store',
+        signal:AbortSignal.timeout(4500),
+      });
+      const actual=response.status;
+      if (!Number.isInteger(actual)) throw new Error('invalid HTTP status');
+      return {name,scope:'live_api',status:'measured',expected:'HTTP '+expected,
+        actual:'HTTP '+actual,passed:actual===expected,requestId,checkedAt};
+    } catch {
+      return unavailable(name,expected);
+    }
+  }));
+}
+export async function operationsReport({liveProbe=process.env.VERCEL_ENV==='production',fetchImpl=globalThis.fetch}={}) {
   const requestId = randomUUID();
   const checkedAt = new Date().toISOString();
   const { normal, suspicious } = fixtureRequests();
@@ -51,7 +89,7 @@ export async function operationsReport() {
     revocation:{status:'not_run',reason:'Engine enforcement is not observed by this server; a proposal is not a revocation.'},
     restore:{version:policyBackup.version,policyBackup,status:checks.find(x=>x.name==='note_restore')?.status??'not_run',
       policyApply:{status:'not_run',reason:'CLI artifact is not runtime evidence'}},
-    regression:[...results,...detections,...Array.from({length:11},(_,i)=>({
+    regression:[...results,...detections,...await measuredLiveChecks({enabled:liveProbe,fetchImpl}),...Array.from({length:11},(_,i)=>({
       name:'stage_'+(i+1)+'_live',scope:'live_api',status:'not_run',expected:'Normal request allowed; forbidden request denied',actual:null,requestId:null,checkedAt:null
     }))],
     assault:{total:41,measured:0,notRun:41,status:'not_run',source:'judge',
