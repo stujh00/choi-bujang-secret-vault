@@ -16,6 +16,7 @@ export default async function handler(request,response) {
   const db={
     get: async id => supabase.from('vault_notes').select('id,owner_id,title,content').eq('id',id).maybeSingle(),
     getOwned: async(id,owner)=>supabase.from('vault_notes').select('id,owner_id,title,content').eq('id',id).eq('owner_id',owner).maybeSingle(),
+    insert: async(id,owner,title,content)=>supabase.from('vault_notes').insert({id,owner_id:owner,title,content}).select('id,owner_id,title,content').single(),
     update: async(id,owner,title,content)=>supabase.from('vault_notes').update({title,content}).eq('id',id).eq('owner_id',owner).select('id,owner_id,title,content').maybeSingle(),
   };
   return restoreOneNote(request,response,{

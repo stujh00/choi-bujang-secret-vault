@@ -15,6 +15,7 @@ function fakeDb(initial={...note,content:'changed'}) {
  const state={row:initial ? {...initial} : null,writes:0};
  return {state,
  get:async()=>({data:state.row}),
+ insert:async(id,owner,title,content)=>{state.writes++;state.row={id,owner_id:owner,title,content};return {data:state.row};},
  update:async(_id,_owner,title,content)=>{state.writes++;state.row={...state.row,title,content};return {data:state.row};},
  getOwned:async(_id,owner)=>({data:state.row?.owner_id===owner?state.row:null}),
  };
@@ -53,8 +54,10 @@ test('owner mismatch and body injection never restore',async()=>{
   assert.ok([400,403,404].includes(response.status));assert.equal(db.state.writes,0);
  }
 });
-test('missing original record returns 404 and never upserts',async()=>{
+test('deleted B note is restored from verified backup with its original ID and owner',async()=>{
  const db=fakeDb(null);
  const {response}=await run({db});
- assert.equal(response.status,404);assert.equal(db.state.writes,0);
+ assert.equal(response.status,200);assert.equal(db.state.writes,1);
+ assert.equal(db.state.row.id,ID);assert.equal(db.state.row.owner_id,B);
+ assert.equal(db.state.row.content,note.content);
 });

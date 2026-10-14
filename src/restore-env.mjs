@@ -35,12 +35,16 @@ export async function restoreOneNote(req,res,{verifyUser,db,env=process.env}) {
   if(m[1].toLowerCase()!==backup.id.toLowerCase()) return send(res,404,{error:'BACKUP_NOTE_NOT_FOUND'});
   if(session.userId.toLowerCase()!==backup.ownerId.toLowerCase())
     return send(res,403,{error:'RESTORE_FORBIDDEN'});
-  // Only query and mutate the single ID. Never upsert a missing ID or change owner.
+  // Restrict every mutation to the exact verified backup ID and owner.
   const original=await db.get(backup.id);
   if(original.error) return send(res,503,{error:'DATABASE_UNAVAILABLE'});
-  if(!original.data) return send(res,404,{error:'NOTE_NOT_FOUND'});
-  if(original.data.owner_id!==backup.ownerId) return send(res,403,{error:'RESTORE_FORBIDDEN'});
-  const restored=await db.update(backup.id,backup.ownerId,backup.title,backup.content);
+  if(original.data && original.data.owner_id!==backup.ownerId)
+    return send(res,403,{error:'RESTORE_FORBIDDEN'});
+  // A deleted note is restored by inserting the single backup row, never by
+  // guessing a missing owner or creating any other record.
+  const restored=original.data
+    ? await db.update(backup.id,backup.ownerId,backup.title,backup.content)
+    : await db.insert(backup.id,backup.ownerId,backup.title,backup.content);
   if(restored.error||!restored.data) return send(res,503,{error:'RESTORE_FAILED'});
   const check=await db.get(backup.id);
   const {createHash,timingSafeEqual}=await import('node:crypto');
