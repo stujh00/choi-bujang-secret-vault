@@ -16,6 +16,11 @@ on:
       - 'test/zone-stage8.test.mjs'
       - 'test/detect-stage9.test.mjs'
       - 'test/restore-stage10.test.mjs'
+      - 'test/restore-env-stage10.test.mjs'
+      - 'src/restore-env.mjs'
+      - 'src/restore-backup.mjs'
+      - 'api/restore/notes/[id].js'
+      - 'api/notes/restore/[id].js'
       - 'src/restore-note.mjs'
       - 'api/restore.js'
       - 'supabase/stage10-verified-backup.sql'
@@ -59,6 +64,8 @@ jobs:
         run: npm run test
       - name: Validate stage 10 restore authentication and failure handling
         run: node --test test/restore-stage10.test.mjs
+      - name: Check isolated environment backup restore tests
+        run: node --test test/restore-env-stage10.test.mjs
       - name: Build static files without deployment
         run: npm run build -- --local
       - name: Probe public deployment restore route without credentials
@@ -88,7 +95,7 @@ jobs:
           PY
       - name: Prepare ignored submission explanation (not committed)
         run: |
-          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"10단계: 검증된 B 가상 메모 1건을 DB 비공개 스냅샷에 해시 확인 후 보존했습니다. POST /api/restore는 심판 B로 검증된 인증만 허용하며 DB 함수가 오직 ID 0005만 복원하고 감사 로그를 추가합니다. 실제 변조·삭제 복원은 심판 미실행입니다.", blockedAt:null}, null, 2) + "\n")'
+          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"10단계 격리 심판 대응: 백업은 RESTORE_NOTE_BACKUP_JSON 및 RESTORE_NOTE_BACKUP_SHA256에서만 읽고 SHA-256 이중 검증합니다. 단건 복구만 허용하며 복구 후 본인 조회와 타인 조회 거부를 다시 검증합니다. 운영 변조/삭제 실측은 심판 실행 전까지 미실행입니다.", blockedAt:null}, null, 2) + "\n")'
       - name: Create ignored submission bundle from this checked-out commit
         run: npm run bundle
       - name: Archive sanitized submission metadata
