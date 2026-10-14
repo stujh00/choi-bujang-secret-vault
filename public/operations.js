@@ -13,6 +13,11 @@ async function refresh(){
     line($('summary'),'실제 신원 회수: '+data.revocation.status+' · 제안은 회수 완료가 아닙니다.');
     line($('summary'),`복구 사본 버전 ${data.restore.version} · 메모 복구 ${data.restore.status} · 정책 적용 ${data.restore.policyApply.status}`);
     for(const check of data.checks)line($('summary'),`${check.name}: ${check.status} · 현재 런타임 기록 ${check.evidence.length}개`);
+    const live = data.regression.filter(x=>x.scope==='live_api');
+    const passed = live.filter(x=>x.status==='measured'&&x.passed===true).length;
+    const failed = live.filter(x=>x.status==='measured'&&x.passed!==true).length;
+    const notRun = live.filter(x=>x.status==='not_run').length;
+    line($('summary'),`실제 API 서버 점검: 통과 ${passed}건 · 실패 ${failed}건 · 미실행 ${notRun}건 (서버 기록 기준)`);
     for(const row of data.regression){const tr=document.createElement('tr');for(const text of [row.name+' / '+row.scope,row.status,row.expected,row.actual??'미실행',(row.requestId??'—')+' / '+(row.checkedAt??'—')]){const td=document.createElement('td');td.textContent=text;tr.append(td);}$('rows').append(tr);}
     // Only server-returned regression rows are evidence in the operation room.
     // Browser-only probes must not be counted as server measurements.
