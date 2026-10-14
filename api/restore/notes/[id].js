@@ -1,3 +1,4 @@
+import {requireRegisteredDevice} from '../../../src/device-registration.mjs';
 import fs from 'node:fs';
 import {createClient} from '@supabase/supabase-js';
 import {createLoginVerifier} from '../../../src/verify-login.mjs';
@@ -39,6 +40,8 @@ export default async function handler(req,res) {
       if(cookie) authorization='Bearer '+cookie.access_token;
     }
     const login=await verify(authorization);
-    return login?.userId?login:null;
+    if(!login?.userId)return null;
+    const denied=await requireRegisteredDevice(req,login,client,key,config.step);
+    return denied?null:login;
   }})(req,res);
 }

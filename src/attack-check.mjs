@@ -10,7 +10,7 @@ async function fetchText(url, options = {}) {
 }
 
 export async function runAttackChecks(config) {
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(config.step)) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   let app;
   try {
     app = new URL(config.publicAppUrl);
@@ -80,7 +80,7 @@ export async function runAttackChecks(config) {
     ];
   }
 
-  if (config.step >= 5 && config.step <= 10) {
+  if (config.step >= 5 && config.step <= 11) {
     const { response: pageResponse, text: pageText } = await fetchText(new URL('/', app));
     const { response: identityResponse, text: identityText } = await fetchText(new URL('/aleph.json', app));
     const anonKey = pageText.match(/\bsb_publishable_[A-Za-z0-9_-]{8,}\b/u)?.[0];
@@ -160,7 +160,7 @@ export async function runAttackChecks(config) {
         observed: sourceUpdateObserved,
       },
     ];
-    if (config.step >= 6 && config.step <= 10) {
+    if (config.step >= 6 && config.step <= 11) {
       const { decide, RULE_IDS } = await import('./decider.mjs');
       const { checkDecider } = await import('../scripts/decider-test.mjs');
       const localChecks = await checkDecider({ decide, ruleIds: RULE_IDS });
@@ -183,7 +183,7 @@ export async function runAttackChecks(config) {
         });
       }
     }
-    if (config.step >= 8 && config.step <= 10) {
+    if (config.step >= 8 && config.step <= 11) {
       const { ANNOUNCEMENT_ID, exactRoute, verifiedInstructor } = await import('./resource-zones.mjs');
       const validNoteRoute = exactRoute({
         url: '/api/notes/00000000-0000-4000-8000-000000000001',
@@ -223,7 +223,7 @@ export async function runAttackChecks(config) {
         observed: '미실행: 다른 계정의 비밀값 없이 운영 DB 교차 계정 요청은 수행하지 않음',
       });
     }
-    if (config.step >= 9 && config.step <= 10) {
+    if (config.step >= 9 && config.step <= 11) {
       const { detect } = await import('./detect.mjs');
       const { checkDetection } = await import('../scripts/detect-test.mjs');
       const localChecks = await checkDetection(detect);
@@ -248,7 +248,7 @@ export async function runAttackChecks(config) {
       // No device ID is included in docs/DETECT_EVENTS.md. This does not
       // claim to revoke a real session or measure a real response time.
     }
-    if (config.step === 10) {
+    if (config.step >= 10) {
       attempts.push({attackId:'step10_restore_contract',
         expected:'Environment backup, empty body, verified owner, actual GET handler retests',
         observed:'not_run: restore requires a private environment backup and authenticated owner; bundle uses read-only checks only'});

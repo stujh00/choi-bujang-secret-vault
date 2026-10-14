@@ -1,3 +1,4 @@
+import {requireRegisteredDevice} from '../../src/device-registration.mjs';
 import { readOwnedNote } from '../../src/note-read.mjs';
 import fs from 'node:fs';
 import { exactRoute, validNotePayload } from '../../src/resource-zones.mjs';
@@ -48,6 +49,8 @@ export default async function handler(request, response) {
 
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(url, secretKey);
+  const deviceDenied=await requireRegisteredDevice(request,login,supabase,secretKey,config.step);
+  if(deviceDenied) return response.status(deviceDenied.status).json({error:deviceDenied.error});
   const resource = exactRoute(request, 'notes');
   const noteId = resource?.type === 'item' ? resource.id : null;
 

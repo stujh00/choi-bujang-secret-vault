@@ -128,6 +128,12 @@ test('메모 API는 목록과 모든 단건 작업을 소유자에게만 허용�
     if (parsedUrl.pathname.endsWith('/.well-known/jwks.json')) {
       return Response.json({ keys: [publicJwk] });
     }
+    if (parsedUrl.pathname.endsWith('/rest/v1/vault_devices')) {
+      return Response.json([{id:'00000000-0000-4000-8000-000000000099',
+        owner_id:parsedUrl.searchParams.get('owner_id').slice(3),
+        device_id:parsedUrl.searchParams.get('device_id').slice(3),status:'approved',
+        approved_at:new Date(Date.now()-10000).toISOString(),expires_at:new Date(Date.now()+60000).toISOString()}]);
+    }
     if (!parsedUrl.pathname.endsWith('/rest/v1/vault_notes')) {
       throw new Error('Unexpected URL in ownership test.');
     }
@@ -174,7 +180,7 @@ test('메모 API는 목록과 모든 단건 작업을 소유자에게만 허용�
     let responseBody;
     const headers = cookieAuth
       ? { cookie: sessionCookie(userToken), host: 'student-defense.vercel.app', origin }
-      : { authorization: `Bearer ${userToken}` };
+      : { authorization: `Bearer ${userToken}`, cookie:sessionCookie(userToken) };
     await handler({
       method,
       url: path,

@@ -1,3 +1,4 @@
+import {requireRegisteredDevice} from './device-registration.mjs';
 import fs from 'node:fs';
 import { readSessionCookie, requestOriginAllowed, readJsonBody } from './auth-session.mjs';
 import { createLoginVerifier } from './verify-login.mjs';
@@ -45,6 +46,8 @@ export async function handleAnnouncement(request, response, kind) {
   }
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(url, secretKey);
+  const deviceDenied=await requireRegisteredDevice(request,login,supabase,secretKey,readConfig().step);
+  if(deviceDenied) return response.status(deviceDenied.status).json({error:deviceDenied.error});
 
   if (request.method === 'GET') {
     const { data, error } = await supabase.from('vault_notes')

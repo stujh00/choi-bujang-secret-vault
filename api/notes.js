@@ -1,3 +1,4 @@
+import {requireRegisteredDevice} from '../src/device-registration.mjs';
 import fs from 'node:fs';
 import { ANNOUNCEMENT_ID, exactRoute, validNotePayload, isNoteId } from '../src/resource-zones.mjs';
 import { readSessionCookie, requestOriginAllowed } from '../src/auth-session.mjs';
@@ -54,6 +55,8 @@ export default async function handler(request, response) {
 
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(url, secretKey);
+  const deviceDenied=await requireRegisteredDevice(request,login,supabase,secretKey,config.step);
+  if(deviceDenied) return response.status(deviceDenied.status).json({error:deviceDenied.error});
   const route = exactRoute(request, 'notes');
   if (!route) return response.status(404).json({ error: 'RESOURCE_NOT_FOUND' });
   const pathname = new URL(request.url, 'https://local.invalid').pathname;

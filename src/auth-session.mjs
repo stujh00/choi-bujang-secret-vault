@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 
 export const SESSION_COOKIE = '__Host-vault_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
@@ -45,6 +45,7 @@ export function writeSessionCookie(response, session, secretKey) {
   const payload = Buffer.from(JSON.stringify({
     accessToken: session.access_token,
     refreshToken: session.refresh_token,
+    deviceId: /^[0-9a-f]{16}$/.test(session.device_id ?? '') ? session.device_id : randomBytes(8).toString('hex'),
   })).toString('base64url');
   response.setHeader('Set-Cookie', `${SESSION_COOKIE}=${payload}.${signature(payload, secretKey)}; Path=/; Max-Age=${SESSION_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`);
 }
@@ -73,7 +74,8 @@ export function readSessionCookie(request, secretKey) {
     const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     if (typeof session.accessToken !== 'string' || typeof session.refreshToken !== 'string'
         || session.accessToken.length > 4096 || session.refreshToken.length > 4096) return null;
-    return { access_token: session.accessToken, refresh_token: session.refreshToken };
+    return { access_token: session.accessToken, refresh_token: session.refreshToken,
+      ...(/^[0-9a-f]{16}$/.test(session.deviceId ?? '') ? { device_id: session.deviceId } : {}) };
   } catch {
     return null;
   }

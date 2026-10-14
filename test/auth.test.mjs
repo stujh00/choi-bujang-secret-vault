@@ -138,6 +138,7 @@ test('session refresh rotates the HttpOnly cookie and exposes only verified emai
       });
     }
     if (url.pathname.endsWith('/.well-known/jwks.json')) return Response.json({ keys: [publicJwk] });
+    if (url.pathname.endsWith('/rest/v1/vault_devices')) return Response.json([]);
     if (url.pathname.endsWith('/user')) {
       assert.equal(new Headers(options.headers).get('authorization'), `Bearer ${refreshedToken}`);
       return Response.json({ id: userId, email: userEmail, aud: 'authenticated', role: 'authenticated' });
@@ -152,7 +153,7 @@ test('session refresh rotates the HttpOnly cookie and exposes only verified emai
   }, response.response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body, { user: { email: userEmail }, device: { registered: false, status: 'unverified', source: 'server' } });
+  assert.deepEqual(response.body, { user: { email: userEmail }, device: { registered: false, status: 'unverified', source: 'server', requestId:null } });
   assert.equal(refreshCount, 1);
   assert.match(response.headers.get('set-cookie'), /HttpOnly; Secure; SameSite=Lax/u);
   const updatedSession = readSessionCookie({ headers: { cookie: response.headers.get('set-cookie') } }, secretForTests);

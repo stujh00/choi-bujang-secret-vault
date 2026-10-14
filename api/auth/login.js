@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { authEnvironment, readJsonBody, requestOriginAllowed, writeSessionCookie } from '../../src/auth-session.mjs';
+import { authEnvironment, readSessionCookie, readJsonBody, requestOriginAllowed, writeSessionCookie } from '../../src/auth-session.mjs';
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
@@ -32,7 +32,7 @@ export default async function handler(request, response) {
     if (error || !data.session || !data.user) {
       return response.status(error?.status === 429 ? 429 : 401).json({ error: 'LOGIN_FAILED' });
     }
-    writeSessionCookie(response, data.session, environment.secretKey);
+    writeSessionCookie(response, {...data.session,device_id:readSessionCookie(request,environment.secretKey)?.device_id}, environment.secretKey);
     return response.status(200).json({ user: { email: data.user.email ?? null } });
   } catch {
     return response.status(502).json({ error: 'AUTH_PROVIDER_UNAVAILABLE' });

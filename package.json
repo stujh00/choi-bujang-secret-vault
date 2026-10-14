@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-public.mjs",
-    "test": "node --test test/auth.test.mjs test/package-starter.test.mjs test/r5.test.mjs test/xdr-run.test.mjs test/decider-stage7.test.mjs test/zone-stage8.test.mjs test/detect-stage9.test.mjs test/restore-env-stage10.test.mjs test/restore-policy-windows.test.mjs test/restore-http-stage10.test.mjs test/restore-policy-rebuild.test.mjs test/pwa-stage11.test.mjs",
+    "test": "node --test test/auth.test.mjs test/package-starter.test.mjs test/r5.test.mjs test/xdr-run.test.mjs test/decider-stage7.test.mjs test/zone-stage8.test.mjs test/detect-stage9.test.mjs test/restore-env-stage10.test.mjs test/restore-policy-windows.test.mjs test/restore-http-stage10.test.mjs test/restore-policy-rebuild.test.mjs test/pwa-stage11.test.mjs test/device-stage11.test.mjs",
     "test:r5": "node --test test/r5.test.mjs",
     "test:package": "node --test test/package-starter.test.mjs",
     "bundle": "node scripts/bundle.mjs",
@@ -13,7 +13,8 @@
     "fixture:7": "node scripts/fixture-7.mjs",
     "xdr:run": "node scripts/xdr-run.mjs",
     "restore:plan": "node scripts/restore-policy.mjs",
-    "restore:apply": "node scripts/restore-policy.mjs --apply"
+    "restore:apply": "node scripts/restore-policy.mjs --apply",
+    "devices:review": "node --env-file-if-exists=.env.local scripts/review-devices.mjs"
   },
   "engines": {
     "node": ">=22"

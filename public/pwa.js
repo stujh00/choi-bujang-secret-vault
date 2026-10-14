@@ -12,7 +12,8 @@ export function showDeviceStatus(serverSession) {
     deviceStatus.className = 'status success';
   } else {
     deviceStatus.textContent = serverSession?.user
-      ? '기기 확인 미완료 · 로그인과 기기 승인은 별도로 확인합니다.'
+      ? ({pending:'기기 승인 대기 · 운영자 확인 후 상태 확인을 눌러 주세요.',rejected:'기기 승인 거부',revoked:'기기 승인이 회수되었습니다.',expired:'기기 승인 기간이 만료되었습니다.'}[device?.status]
+        ?? '기기 확인 미완료 · 이 기기의 승인을 요청해 주세요.')
       : '기기 확인 전 · 먼저 로그인해 주세요.';
     deviceStatus.className = 'status info';
   }

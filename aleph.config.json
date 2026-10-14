@@ -1,5 +1,5 @@
 {
-  "step": 10,
+  "step": 11,
   "repoUrl": "https://github.com/stujh00/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-six-zeta.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -22,7 +22,9 @@
     "DELETE /api/announcements/:id",
     "POST /api/restore/notes/:id",
     "GET /api/notes/audit",
-    "GET /api/operations"
+    "GET /api/operations",
+    "GET /api/auth/session",
+    "POST /api/auth/session"
   ],
   "originalApiUrl": "https://fkaqjesnvkqxrftaqmxe.supabase.co/rest/v1/vault_notes",
   "restoreRoute": "/api/restore/notes/:id"

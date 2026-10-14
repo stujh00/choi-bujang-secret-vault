@@ -1,9 +1,16 @@
-name: Stage 10 verified recovery checks
+name: Stage 11 device approval and recovery checks
 
 on:
   push:
     branches: [main]
     paths:
+      - 'src/device-registration.mjs'
+      - 'src/auth-session.mjs'
+      - 'api/auth/session.js'
+      - 'api/auth/login.js'
+      - 'public/**'
+      - 'test/device-stage11.test.mjs'
+      - 'test/pwa-stage11.test.mjs'
       - 'src/decider.mjs'
       - 'src/attack-check.mjs'
       - 'scripts/decider-test.mjs'
@@ -99,13 +106,13 @@ jobs:
           PY
       - name: Prepare ignored submission explanation (not committed)
         run: |
-          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"10단계 격리 심판 대응: 백업은 RESTORE_NOTE_BACKUP_JSON 및 RESTORE_NOTE_BACKUP_SHA256에서만 읽고 SHA-256 이중 검증합니다. 단건 복구만 허용하며 복구 후 본인 조회와 타인 조회 거부를 다시 검증합니다. 운영 변조/삭제 실측은 심판 실행 전까지 미실행입니다.", blockedAt:null}, null, 2) + "\n")'
+          node -e 'require("node:fs").writeFileSync("bundle-notes.json", JSON.stringify({explanation:"11단계 기기 승인 및 기존 복구 유지: 서버 승인 상태로 보호 화면을 열고 학생 API 요청마다 등록을 확인합니다. 승인 요청은 대기 상태만 생성하며 브라우저 저장소에 기기 키나 토큰을 넣지 않습니다.  백업은 RESTORE_NOTE_BACKUP_JSON 및 RESTORE_NOTE_BACKUP_SHA256에서만 읽고 SHA-256 이중 검증합니다. 단건 복구만 허용하며 복구 후 본인 조회와 타인 조회 거부를 다시 검증합니다. 운영 변조/삭제 실측은 심판 실행 전까지 미실행입니다.", blockedAt:null}, null, 2) + "\n")'
       - name: Create ignored submission bundle from this checked-out commit
         run: npm run bundle
       - name: Archive sanitized submission metadata
         uses: actions/upload-artifact@v4
         with:
-          name: stage10-submission
+          name: stage11-submission
           path: artifacts/submission.json
           retention-days: 7
       - name: Summarize without printing private responses
