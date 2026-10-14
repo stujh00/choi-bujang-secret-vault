@@ -1,42 +1,41 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import {createHash, timingSafeEqual} from 'node:crypto';
 
-function digest(bytes) { return createHash('sha256').update(bytes).digest(); }
-function matchHash(actual, expected) {
-  if (typeof expected !== 'string' || !/^[a-f0-9]{64}$/i.test(expected)) return false;
-  return timingSafeEqual(actual, Buffer.from(expected, 'hex'));
+export const sha256 = value => createHash('sha256').update(value, 'utf8').digest('hex');
+export function equalDigest(actual, expected) {
+  return typeof actual === 'string' && typeof expected === 'string'
+    && /^[a-f0-9]{64}$/i.test(actual) && /^[a-f0-9]{64}$/i.test(expected)
+    && timingSafeEqual(Buffer.from(actual,'hex'),Buffer.from(expected,'hex'));
 }
-function object(x) { return x && typeof x === 'object' && !Array.isArray(x); }
-function uuid(x) { return typeof x === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(x); }
+const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value);
 
-// Read exclusively from the judge-injected environment; never look for on-disk
-// copies, live data or a Supabase snapshot when the private backup is absent.
-export function readVerifiedBackup(env = process.env) {
-  const serialized = env.RESTORE_NOTE_BACKUP_JSON;
-  const assertedHash = env.RESTORE_NOTE_BACKUP_SHA256;
-  if (typeof serialized !== 'string' || !serialized || typeof assertedHash !== 'string')
-    return { ok:false, code:'BACKUP_UNAVAILABLE' };
-  const bytes = Buffer.from(serialized, 'utf8');
-  if (bytes.length > 1024 * 1024 || !matchHash(digest(bytes), assertedHash))
-    return { ok:false, code:'BACKUP_UNVERIFIED' };
+// Only environment bytes are the backup. No DB snapshot, file or live-content fallback.
+export function readVerifiedBackup(env=process.env, requestedId) {
+  const raw=env.RESTORE_NOTE_BACKUP_JSON;
+  const outer=env.RESTORE_NOTE_BACKUP_SHA256;
+  if(typeof raw!=='string'||raw.length===0||typeof outer!=='string'||!outer)
+    return {ok:false,code:'BACKUP_UNAVAILABLE',status:503};
+  if(Buffer.byteLength(raw,'utf8')>1024*1024||!equalDigest(sha256(raw),outer))
+    return {ok:false,code:'BACKUP_UNVERIFIED',status:503};
   let document;
-  try { document = JSON.parse(serialized); } catch { return { ok:false, code:'BACKUP_UNVERIFIED' }; }
-  if (!object(document)) return { ok:false, code:'BACKUP_UNVERIFIED' };
-  // Accept common envelope forms, but never infer a missing owner or content.
-  const note = object(document.note) ? document.note
-    : object(document.backup?.note) ? document.backup.note
-    : object(document.memo) ? document.memo : document;
-  const id = note.id ?? note.noteId;
-  const ownerId = note.owner_id ?? note.ownerId;
-  const title = note.title;
-  const content = note.content ?? note.body;
-  if (!uuid(id) || !uuid(ownerId) || typeof title !== 'string'
-      || typeof content !== 'string' || title.length > 200 || content.length > 20000)
-    return { ok:false, code:'BACKUP_UNVERIFIED' };
-  const statedContentHash = note.contentSha256 ?? note.content_sha256
-    ?? document.contentSha256 ?? document.content_sha256
-    ?? note.bodySha256 ?? document.bodySha256;
-  if (!matchHash(digest(Buffer.from(content, 'utf8')), statedContentHash))
-    return { ok:false, code:'BACKUP_UNVERIFIED' };
-  return {ok:true, backup:Object.freeze({id, ownerId, title, content,
-    contentSha256:digest(Buffer.from(content, 'utf8')).toString('hex')})};
+  try {document=JSON.parse(raw);} catch {return {ok:false,code:'BACKUP_UNVERIFIED',status:503};}
+  const records=Array.isArray(document?.notes)?document.notes
+    : Array.isArray(document)?document
+    : [document?.note ?? document?.backup?.note ?? document?.memo ?? document];
+  if(!records.length||records.some(record=>!object(record)))
+    return {ok:false,code:'BACKUP_UNVERIFIED',status:503};
+  const matches=requestedId?records.filter(record=>typeof(record.id??record.noteId)==='string'&&(record.id??record.noteId).toLowerCase()===requestedId.toLowerCase()):records;
+  if(matches.length===0) return {ok:false,code:'BACKUP_NOTE_NOT_FOUND',status:404};
+  if(matches.length!==1) return {ok:false,code:'BACKUP_UNVERIFIED',status:503};
+  const record=matches[0];
+  const id=record.id??record.noteId;
+  const ownerId=record.owner_id??record.ownerId;
+  const content=record.content??record.body;
+  const contentSha256=record.contentSha256??record.content_sha256??record.bodySha256
+    ??document?.contentSha256??document?.content_sha256??document?.bodySha256;
+  if(!uuid(id)||!uuid(ownerId)||typeof content!=='string'||content.length>20000
+      ||(record.title!==undefined&&(typeof record.title!=='string'||record.title.length>200))
+      ||!equalDigest(sha256(content),contentSha256))
+    return {ok:false,code:'BACKUP_UNVERIFIED',status:503};
+  return {ok:true,backup:Object.freeze({id,ownerId,title:record.title,content,contentSha256:sha256(content)})};
 }

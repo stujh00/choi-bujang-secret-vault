@@ -1,7 +1,7 @@
 import {readSessionCookie} from '../../src/auth-session.mjs';
 import fs from 'node:fs';
 import {createLoginVerifier} from '../../src/verify-login.mjs';
-import {getAuditHistory} from '../../src/restore-env.mjs';
+import {getAuditHistory} from '../../src/restore-state.mjs';
 
 export default async function handler(request,response) {
  response.setHeader('Cache-Control','no-store');
@@ -22,5 +22,6 @@ export default async function handler(request,response) {
  try{session=await createLoginVerifier({config,supabaseSecretKey:secretKey})(authorization);}
  catch{session=null;}
  if(!session) return response.status(401).json({error:'AUTH_REQUIRED'});
- return response.status(200).json({entries:getAuditHistory(session.userId),scope:'current_runtime'});
+ const auditHistory=getAuditHistory(session.userId);
+ return response.status(200).json({auditHistory,entries:auditHistory,scope:'current_runtime'});
 }

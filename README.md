@@ -171,63 +171,39 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - **실제 회수 API, 세션 변경, 회수 경과 시간 측정은 수행하지 않습니다.** 엔진이 실이벤트를 인증해 전달하고 제안을 집행하는 부분은 제공 엔진/심판의 영역이며 `src/decider.mjs`의 5개 항목 응답 형식은 그대로 유지했습니다.
 - 확인: `npm run detect:test` (기본 6건), `npm run test` (경계/다중 사용자/입력 검증), `npm run decider:test`, `npm run fixture:7`, `npm run build -- --local`. 제출용 `npm run bundle`은 커밋 후 GitHub Actions에서 돌리며 가상 탐지 기록과 미실행 운영 회수를 구별합니다.
 
-## 10단계 저장점: 시험 B 메모의 검증된 사본 복원
+## 10단계 저장점 — 환경 변수 복원 재구현
 
-- 10단계 전 Supabase에서 B 시험 메모 UUID `00000000-0000-4000-8000-000000000005`가 기존 4단계 원본 제목·내용과 일치하며 owner_id가 존재함을 직접 확인했습니다.
-- 비공개 `vault_recovery_snapshots`에 B 한 건만 저장했고 무결성 SHA-256, 현재 원본과 일치, anon/authenticated의 복구 RPC 실행 불가를 확인했습니다. 감사 이력은 별도 보존합니다.
-- `POST /api/restore`는 발급자·서명을 검증한 심판 B 신원만 허용하고 일반 사용자·심판 A·다른 대상 ID는 거부합니다. DB 함수 `restore_test_note_b`는 사본의 소유자/해시를 확인해 오직 B 메모 하나만 복원하고 감사 행을 덧붙입니다.
-- 기존 다른 메모, 현재 1~9단계 정책, 감사 기록은 자동 덮어쓰지 않습니다. 변경된 시험 정책을 복원할 별도 사전 검증 사본은 없어 정책 자동 원복은 **미실행**으로 남깁니다.
-- **복구 이후 확인 순서:** 복구 B 메모 ID·소유자·해시 검사 → B 정상 메모 GET → A의 B 메모 GET/PUT 거부 → 미등록 기기 거부(`npm run decider:test`) → 복합 이상 접속(`npm run fixture:7`) → 폭주 탐지(`npm run detect:test`) → 전체 테스트(`npm run test`). 실제 심판 변조·삭제/사후 재시험은 아직 **미실행**입니다.
-- 실행: `npm run test`, `npm run build -- --local`, 커밋 후 `npm run bundle`. 서버 경로 `https://choi-bujang-secret-vault-six-zeta.vercel.app/api/restore`는 심판의 인증된 POST 전용입니다.
+이전 10단계 구현은 GitHub `backup/step10-before-rebuild-20261014` 브랜치에 보존했습니다.
+현재 복원 경로는 `POST /api/restore/notes/:id` 하나입니다.
 
+### 비공개 사본과 복원 계약
 
-### 10단계 백업 재검증 보완 (S10_BACKUP_UNVERIFIED)
+- 사본은 `RESTORE_NOTE_BACKUP_JSON`의 UTF-8 원문과 `RESTORE_NOTE_BACKUP_SHA256`에서만 읽습니다. DB 사본이나 파일로 대체하지 않습니다.
+- JSON 전체 해시와 대상 메모의 본문 해시를 각각 `crypto.timingSafeEqual`로 검증합니다. 사본은 단일 메모 또는 `note`/`notes` 봉투를 지원합니다. 대상에는 `id`, `owner_id` 또는 `ownerId`, `content` 또는 `body`, `contentSha256`이 필요합니다. 제목은 선택 항목이며 누락 시 기존 제목을 보존합니다.
+- 사본 누락·검증 실패 503, 사본에 없는 ID 404, 검증된 토큰 사용자와 다른 소유자 403, body의 소유자·역할·내용 등 입력 400입니다. 인증 실패는 401입니다. 프레임워크가 빈 요청을 `{}`로 표시한 경우는 입력값이 없는 것으로 처리합니다.
+- 한 행만 삽입 또는 수정하며 다른 메모나 감사 행을 DB에 추가하지 않습니다. 응답은 `id`, `ownerVerified`, `contentSha256`, `restored`, `restore.retests`뿐이며 메모 본문·토큰·비밀번호를 포함하지 않습니다.
+- 복원 이후 같은 인증 헤더로 실제 공개 GET 핸들러를 실행합니다. 본인 메모 조회와 DB에 존재하는 타인 메모 조회 거부를 각각 확인합니다. 타인 메모나 실행기가 없으면 `not_run`으로 남기며 성공으로 기록하지 않습니다.
+- `GET /api/notes/audit`는 토큰으로 검증한 사용자 자신의 `auditHistory`만 반환합니다. 감사 기록은 서버 런타임에서 append-only로 유지하고 모듈 재로드 및 정책 복원으로 초기화하지 않습니다. 서로 다른 서버리스 프로세스나 재배포 사이의 영속성은 보장하지 않습니다.
+- `GET /api/operations`는 실제 실행된 확인을 `measured`로, 미실행 항목을 `not_run`으로 표시하며 실행 실패도 그대로 기록합니다.
 
-- 검증용 read-only RPC `verify_test_note_b_backup()`를 Supabase에 별도로 설치했습니다. 복원 전 비공개 백업의 기준 원본 내용·소유자·해시를 다시 읽고 확인합니다.
-- API는 `POST /api/restore`에서 심판 B JWT를 먼저 확인한 뒤 검증 RPC를 호출하며, 실패·누락·해시 형식 불일치 시 복원 RPC를 호출하지 않고 HTTP 503을 반환합니다.
-- 복원 DB 함수도 같은 검증을 트랜잭션 안에서 다시 수행하고 해시가 다르면 변경 없이 중단합니다. 변조/삭제 사후 복원 테스트는 심판이 실행하기 전까지 미실행으로 기록합니다.
+### 정책 사본과 확인 절차
 
-## 10단계 격리 심판용 복구 (환경변수 사본 계약)
+`backups/step10/safe-policy.json`과 `.sha256`에는 공개 정책만 보관합니다.
 
-- 심판 풀이 공유에 따른 추가 복구 경로: `POST /api/restore/notes/:id` (별칭 `POST /api/notes/restore/:id`). 이전 `/api/restore`는 호환 목적으로 유지합니다.
-- 비공개 사본은 공개 GitHub나 임시 파일에서 읽지 않고 **`RESTORE_NOTE_BACKUP_JSON` 및 `RESTORE_NOTE_BACKUP_SHA256`** 환경변수에서만 읽습니다. 바깥 JSON UTF-8 전체 SHA-256과 내부 메모 본문 SHA-256을 비교합니다. 백업 누락·검증 실패면 503, 본문이 있으면 400, 다른 ID는 404, 다른 소유자는 403입니다.
-- 심판 JWT 또는 검증된 학생 JWT와 사본의 소유자를 대조하고, 대상 한 행의 현재 DB 소유자도 검증합니다. 복구 후 행을 재조회해 본문 해시를 다시 비교합니다. 반환값은 본문 없이 ID·해시·소유자 검증·복구 여부·본인 조회 및 타인 조회 거부의 실행 결과만 포함합니다.
-- 감사 이벤트는 본문이나 토큰을 제외한 JSON 메타데이터로 런타임 로그에 기록합니다. 서버리스 프로세스의 메모리 감사 이력은 인스턴스 간 공유되지 않으므로 영속적인 글로벌 로그를 보장하지 않습니다. 실제 정책 사전 백업 및 복원 검증은 **아직 미실행**입니다.
-- 환경변수 사본 데이터/해시는 절대 Git에 올리지 않습니다. 재현용 가짜 데이터 테스트만 `test/restore-env-stage10.test.mjs`에 추가했습니다.
+1. `npm run restore:plan`: 사본을 다시 해시 검증하고 버전·변경 범위·줄별 차이를 보여 줍니다. 검토한 계획은 `artifacts/policy-restore-plan.json`에만 기록합니다.
+2. `npm run restore:apply -- --confirm=step9-reviewed`: 버전과 검토한 파일 해시가 여전히 일치할 때만 지정 정책 파일을 복원합니다. 결과는 `artifacts/policy-restore-result.json`에만 기록합니다. 다른 서비스 파일·메모·감사 이력은 변경하지 않습니다.
+3. `npm test`와 `npm run build -- --local`로 로컬 검증합니다.
 
-### 정책 사본·감사 기록·운영 점검 (추가 구현)
+### 복원 뒤 1~9단계 재시험 순서
 
-- `backups/step10/safe-policy.json`에는 6~9단계를 통과한 공개 판정기 정책 사본만 저장합니다. 메모 본문이나 인증 자료는 포함하지 않습니다. `safe-policy.sha256`과 비교하여 사본 무결성을 재검증합니다.
-- `npm run restore:plan`은 원본 해시 및 현재 판정기와 사본의 차이를 확인하고 변경 항목을 출력합니다. `npm run restore:apply -- --confirm=step9-reviewed`는 버전명을 명시한 경우에만 판정기 한 파일을 되돌리고 `artifacts/policy-restore-result.json`에 실행 메타데이터를 기록합니다. 실제 적용 명령은 아직 실행하지 않았습니다.
-- `GET /api/notes/audit`는 검증된 본인/심판 B만 자기 메모 복구 감사 기록을 조회합니다. **서버리스 인스턴스 메모리 감사 기록은 전역 영속 기록이 아니며** 운영 플랫폼의 append-only 로그 출력과 구분됩니다.
-- `GET /api/operations`는 미실행 항목을 `not_run`으로 정직하게 보고합니다. 심판이 실제 복구/정책 원복을 실행했다고 주장하지 않습니다.
+1. 복원한 B 메모의 ID·소유자·내용 해시 일치 및 다른 메모 보존 확인.
+2. B 본인 GET 성공, B의 A 메모 GET 거부, A의 B 메모 GET/PUT/DELETE 거부 확인.
+3. 비로그인 접근 거부와 정적 JSON의 메모 미노출 확인.
+4. 기기 미등록 거부, 추가 인증, 자원 경계, 폭주 탐지를 `npm run decider:test`, `npm run fixture:7`, `npm run detect:test`로 연습.
+5. 운영 계정으로 실제 재시험하지 않은 항목은 `not_run`으로 유지. 로컬 연습을 심판 통과로 기록하지 않음.
 
-### 배포 함수 수 제한 보완
+### 제출
 
-- Vercel Hobby 배포의 Serverless Functions 최대 12개 제한을 준수하기 위해 10단계에서 추가한 중복 복구 함수 `api/restore.js`와 선택적 별칭 `api/notes/restore/[id].js`를 제거했습니다. 심판 필수 복구 경로 `POST /api/restore/notes/:id`, 감사 조회 `GET /api/notes/audit`, 운영 점검 `GET /api/operations`는 유지합니다. 이전 1~9단계 서버 API는 변경하지 않았습니다.
+커밋 후 `npm run bundle`을 실행합니다. `bundle-notes.json`, 환경 변수 파일 및 `artifacts/submission.json`은 Git에 포함하지 않습니다. 자기 점검의 외부 요청은 GET/HEAD만 사용합니다. 실제 심판 재제출 결과는 아직 미확인입니다.
 
-### Step 10 environment restore contract correction
-
-`POST /api/restore/notes/:id` accepts an empty request with no JSON body.
-The verified token subject must equal the owner in the independently hashed
-`RESTORE_NOTE_BACKUP_JSON` snapshot. A judge role never substitutes the backup
-owner for the token subject. Missing or invalid snapshots return 503, a different
-snapshot ID returns 404, another owner returns 403, and supplied JSON returns 400.
-Only the requested verified note is inserted or updated; restore responses contain
-hashes and metadata, never its content.
-
-After restoring, two GET requests run through the shared public note-read handler:
-the verified owner and a fresh distinct server-generated principal. Metadata is in
-`restore.retests` (also `retests` for compatibility). This measures handler access
-control; it does not claim a network request with another user's token or a judge
-pass. Operations distinguishes measured executions from not_run. Audit entries
-are append-only and filtered by authenticated user; they are process-local and
-may be unavailable across separate serverless runtimes or cold starts.
-
-Run `npm test`, `npm run build -- --local`, and `npm run restore:plan`.
-Policy apply requires `npm run restore:apply -- --confirm=step9-reviewed`; it
-preserves audit history and writes its report only under ignored `artifacts/`.
-Commit source changes before `npm run bundle`; keep `bundle-notes.json` and
-`artifacts/submission.json` out of Git. Bundle checks send only read-only requests.
-Local validation: 55 tests passed, local build passed, policy hash verified.
-Live deployment and judge restoration were not tested in this correction.
+로컬 검증 결과: 테스트 56개 통과, 의존성 설치 및 로컬 빌드 성공. 정책 계획·확인 버전 적용 명령을 실행했으며 현재 정책은 사본과 같아 변경 파일은 없었습니다. 서명 토큰 HTTP 재현은 로컬 DB 어댑터로 수행했으며 실제 심판 점수는 미확인입니다.

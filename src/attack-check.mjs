@@ -118,7 +118,7 @@ export async function runAttackChecks(config) {
     const safeNoMatchId = '00000000-0000-0000-0000-000000000000';
     const updateUrl = new URL(originalApi);
     updateUrl.searchParams.set('id', `eq.${safeNoMatchId}`);
-    const { response: sourceUpdateResponse } = await fetchText(updateUrl, {
+    const sourceUpdateResponse = config.step >= 10 ? null : (await fetchText(updateUrl, {
       method: 'PATCH',
       headers: {
         ...anonHeaders,
@@ -126,7 +126,7 @@ export async function runAttackChecks(config) {
         Prefer: 'return=minimal',
       },
       body: JSON.stringify({ title: null }),
-    });
+    })).response;
 
     const staticAuditPassed = response.ok && staticNoteCount === 0 && !staticHasSampleMarker
       && pageResponse.ok && identityResponse.ok && !staticHasPrivateValue;
@@ -135,7 +135,9 @@ export async function runAttackChecks(config) {
       : sourceReadCount === undefined
         ? `비인가 원본 API GET 결과 HTTP ${sourceReadResponse.status}; 응답 자료는 기록하지 않음`
         : `비인가 원본 API GET이 메모 ${sourceReadCount}건을 반환; 본문 미기록`;
-    const sourceUpdateObserved = sourceUpdateResponse.status === 401 || sourceUpdateResponse.status === 403
+    const sourceUpdateObserved = sourceUpdateResponse === null
+      ? 'not_run: 격리 환경 제출 점검은 GET/HEAD만 사용; 수정 요청 미실행'
+      : sourceUpdateResponse.status === 401 || sourceUpdateResponse.status === 403
       ? `nil UUID 대상 비인가 PATCH가 HTTP ${sourceUpdateResponse.status}로 거부됨`
       : `nil UUID 대상 비인가 PATCH 결과 HTTP ${sourceUpdateResponse.status}; 권한 거부 여부는 본문 없이 판정할 수 없음`;
 

@@ -42,7 +42,7 @@ export default async function handler(request, response) {
   }
   const verifier = createLoginVerifier({ config, supabaseSecretKey: secretKey });
   const login = await verifier(authorization);
-  if (!login || login.kind !== 'student') {
+  if (!login || (login.kind !== 'student' && !(login.kind === 'judge' && request.method === 'GET'))) {
     return response.status(401).json({ error: 'AUTH_REQUIRED' });
   }
 

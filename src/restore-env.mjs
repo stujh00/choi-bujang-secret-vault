@@ -1,87 +1,77 @@
-import { randomUUID } from 'node:crypto';
-import { readOwnedNote } from './note-read.mjs';
-import { readVerifiedBackup } from './restore-backup.mjs';
+import {readVerifiedBackup,sha256,equalDigest} from './restore-backup.mjs';
+import {appendAudit,getAuditHistory,getOperations,recordCheck} from './restore-state.mjs';
+export {getAuditHistory};
+export const getRestoreOperations = getOperations;
 
-function send(res, status, body) { return res.status(status).json(body); }
-const auditHistory = [];
-export function getAuditHistory(ownerId) {
-  return auditHistory.filter(entry=>entry.ownerId===ownerId)
-    .map(({time,action,result,id})=>({time,action,result,id}));
+function hasBody(body) {
+  if(body===undefined||body===null||body==='') return false;
+  if(typeof body==='string') {
+    if(!body.trim()) return false;
+    try {body=JSON.parse(body);} catch {return true;}
+  }
+  // Frameworks may represent a zero-field JSON body as {}; it supplies no data.
+  return body===null||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length!==0;
 }
-export function getRestoreOperations() {
-  return auditHistory.map(({time,action,result})=>({time,action,result}));
-}
-function audit(entry) {
-  // Append-only process-local record plus platform durable stdout; never store
-  // note content, source JSON, password, JWT or raw token.
-  const safe = Object.freeze({time:new Date().toISOString(),...entry});
-  auditHistory.push(safe);
-  console.info('VAULT_RECOVERY_AUDIT', JSON.stringify(safe));
-}
-function isUuid(s) { return typeof s==='string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(s); }
-
-export async function restoreOneNote(req,res,{verifyUser,db,env=process.env}) {
+export async function restoreOneNote(req,res,{verifyUser,db,readRequest,env=process.env}) {
   res.setHeader('Cache-Control','no-store');
-  if(req.method!=='POST') return send(res,405,{error:'METHOD_NOT_ALLOWED'});
-  const raw=req.url??'';
-  if(typeof raw!=='string'||raw.includes('?')||raw.includes('#')||raw.includes('%'))
-    return send(res,404,{error:'RESOURCE_NOT_FOUND'});
-  const m=/^\/api\/restore\/notes\/([0-9a-f-]{36})\/?$/i.exec(raw)
-    ?? /^\/api\/notes\/restore\/([0-9a-f-]{36})\/?$/i.exec(raw);
-  if(!m||!isUuid(m[1])) return send(res,404,{error:'RESOURCE_NOT_FOUND'});
-  // Request body is never a source of restore identity, owner, role or content.
-  if(req.body!==undefined && req.body!=='')
-    return send(res,400,{error:'BODY_NOT_ALLOWED'});
-  const authorization=req.headers?.authorization;
-  const session=await verifyUser(authorization).catch(()=>null);
-  if(!session||!isUuid(session.userId)) return send(res,401,{error:'AUTH_REQUIRED'});
-  const verified=readVerifiedBackup(env);
-  if(!verified.ok) return send(res,503,{error:verified.code});
+  const send=(status,payload)=>res.status(status).json(payload);
+  if(req.method!=='POST') return send(405,{error:'METHOD_NOT_ALLOWED'});
+  const match=/^\/api\/(?:restore\/notes|notes\/restore)\/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\/?$/i.exec(req.url??'');
+  if(!match) return send(404,{error:'RESOURCE_NOT_FOUND'});
+  if(hasBody(req.body)) return send(400,{error:'BODY_NOT_ALLOWED'});
+  let user;
+  try {user=await verifyUser(req.headers?.authorization);} catch {user=null;}
+  if(typeof user?.userId!=='string'||!user.userId) return send(401,{error:'AUTH_REQUIRED'});
+  const reject=(status,error)=>{
+    appendAudit({ownerId:user.userId,id:match[1],action:'restore',result:error,status});
+    return send(status,{error});
+  };
+  const verified=readVerifiedBackup(env,match[1]);
+  recordCheck('backup_sha256',{status:'measured',passed:verified.ok,httpStatus:verified.ok?200:verified.status});
+  if(!verified.ok) return reject(verified.status,verified.code);
   const backup=verified.backup;
-  if(m[1].toLowerCase()!==backup.id.toLowerCase()) return send(res,404,{error:'BACKUP_NOTE_NOT_FOUND'});
-  if(session.userId.toLowerCase()!==backup.ownerId.toLowerCase())
-    return send(res,403,{error:'RESTORE_FORBIDDEN'});
-  // Restrict every mutation to the exact verified backup ID and owner.
-  const original=await db.get(backup.id);
-  if(original.error) return send(res,503,{error:'DATABASE_UNAVAILABLE'});
-  if(original.data && original.data.owner_id!==backup.ownerId)
-    return send(res,403,{error:'RESTORE_FORBIDDEN'});
-  // A deleted note is restored by inserting the single backup row, never by
-  // guessing a missing owner or creating any other record.
-  const restored=original.data
-    ? await db.update(backup.id,backup.ownerId,backup.title,backup.content)
-    : await db.insert(backup.id,backup.ownerId,backup.title,backup.content);
-  if(restored.error||!restored.data) return send(res,503,{error:'RESTORE_FAILED'});
-  const check=await db.get(backup.id);
-  const {createHash,timingSafeEqual}=await import('node:crypto');
-  const hash=typeof check.data?.content==='string'
-    ?createHash('sha256').update(Buffer.from(check.data.content,'utf8')).digest('hex'):null;
-  if(check.error||!check.data||check.data.owner_id!==backup.ownerId
-      ||hash===null||!timingSafeEqual(Buffer.from(hash,'hex'),Buffer.from(backup.contentSha256,'hex'))) {
-    audit({ownerId:session.userId,id:backup.id,action:'restore',result:'postcheck_failed'});
-    return send(res,503,{error:'RESTORE_VERIFICATION_FAILED'});
-  }
-  audit({ownerId:session.userId,id:backup.id,action:'restore',result:'verified'});
-  // Dispatch real GET requests through the same handler as /api/notes/:id.
-  // No body or token is retained in the evidence. A fresh foreign principal
-  // exercises the owner predicate without needing another user's credentials.
-  let foreignOwner;
-  do { foreignOwner=randomUUID(); } while(foreignOwner===backup.ownerId);
-  async function retest(userId, expected) {
-    let status=0;
-    const response={setHeader(){},status(code){status=code;return this;},json(){}};
-    try {
-      await readOwnedNote({method:'GET',url:'/api/notes/'+backup.id},response,
-        {login:{userId},db});
-      return {measured:true,method:'GET',path:'/api/notes/'+backup.id,status,
-        passed:status===expected};
-    } catch {return {measured:false,status:null,passed:false};}
-  }
-  const retests={ownRead:await retest(session.userId,200),
-    otherReadDenied:await retest(foreignOwner,404)};
-  const retestPassed=retests.ownRead.passed&&retests.otherReadDenied.passed;
-  audit({ownerId:session.userId,id:backup.id,action:'retest',result:retestPassed?'passed':'failed'});
-  if(!retestPassed) return send(res,503,{error:'POST_RESTORE_RETEST_FAILED',retests});
-  return send(res,200,{id:backup.id,restored:true,ownerVerified:true,
-    contentSha256:backup.contentSha256,retests,restore:{retests}});
+  if(user.userId.toLowerCase()!==backup.ownerId.toLowerCase()) return reject(403,'RESTORE_FORBIDDEN');
+  try {
+    const original=await db.get(backup.id);
+    if(original.error) return reject(503,'DATABASE_UNAVAILABLE');
+    if(original.data&&original.data.owner_id.toLowerCase()!==backup.ownerId.toLowerCase())
+      return reject(403,'RESTORE_FORBIDDEN');
+    const title=backup.title??original.data?.title??'';
+    const write=original.data?await db.update(backup.id,backup.ownerId,title,backup.content)
+      :await db.insert(backup.id,backup.ownerId,title,backup.content);
+    if(write.error||!write.data) return reject(503,'RESTORE_FAILED');
+    const check=await db.get(backup.id);
+    const restored=!check.error&&check.data?.id===backup.id
+      &&check.data?.owner_id===backup.ownerId&&typeof check.data.content==='string'
+      &&equalDigest(sha256(check.data.content),backup.contentSha256);
+    recordCheck('note_restore',{status:'measured',passed:restored,httpStatus:restored?200:503});
+    if(!restored) return reject(503,'RESTORE_VERIFICATION_FAILED');
+    appendAudit({ownerId:user.userId,id:backup.id,action:'restore',result:'restored',status:200});
+    // Execute authenticated GET requests using the exact original request credentials.
+    // The forbidden case reads a real foreign note, never an invented principal.
+    async function retest(name,id,expected) {
+      if(typeof readRequest!=='function'||!id) return {status:'not_run',measured:false,passed:null};
+      const request={method:'GET',url:'/api/notes/'+id,headers:{...req.headers}};
+      try {
+        const result=await readRequest(request);
+        const passed=expected.includes(result.status);
+        recordCheck(name,{status:'measured',passed,httpStatus:result.status});
+        appendAudit({ownerId:user.userId,id,action:'retest',result:passed?'passed':'failed',status:result.status});
+        return {status:'measured',measured:true,method:'GET',path:request.url,httpStatus:result.status,passed};
+      } catch {
+        recordCheck(name,{status:'measured',passed:false,httpStatus:503});
+        return {status:'measured',measured:true,httpStatus:503,passed:false};
+      }
+    }
+    const ownRead=await retest('own_read',backup.id,[200]);
+    let foreign;
+    if(typeof db.findForeign==='function') {
+      try {foreign=await db.findForeign(user.userId);} catch {foreign=null;}
+    }
+    const otherId=!foreign?.error&&foreign?.data?.owner_id!==user.userId?foreign?.data?.id:null;
+    const otherReadDenied=await retest('other_read_denied',otherId,[403,404]);
+    const retests={ownRead,otherReadDenied};
+    return send(200,{id:backup.id,ownerVerified:true,contentSha256:backup.contentSha256,restored:true,
+      restore:{retests}});
+  } catch {return reject(503,'RESTORE_FAILED');}
 }
