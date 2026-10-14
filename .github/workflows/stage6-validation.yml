@@ -15,8 +15,10 @@ on:
       - 'test/decider-stage7.test.mjs'
       - 'test/zone-stage8.test.mjs'
       - 'test/detect-stage9.test.mjs'
-      - 'test/restore-stage10.test.mjs'
       - 'test/restore-env-stage10.test.mjs'
+      - 'src/restore-state.mjs'
+      - 'test/restore-http-stage10.test.mjs'
+      - 'test/restore-policy-rebuild.test.mjs'
       - 'src/restore-env.mjs'
       - 'src/restore-backup.mjs'
       - 'backups/step10/safe-policy.json'
@@ -25,10 +27,6 @@ on:
       - 'api/notes/audit.js'
       - 'api/operations.js'
       - 'api/restore/notes/[id].js'
-      - 'api/notes/restore/[id].js'
-      - 'src/restore-note.mjs'
-      - 'api/restore.js'
-      - 'supabase/stage10-verified-backup.sql'
       - 'src/detect.mjs'
       - 'docs/DETECT_EVENTS.md'
       - 'scripts/detect-test.mjs'
@@ -68,7 +66,7 @@ jobs:
       - name: Run existing project regression tests
         run: npm run test
       - name: Validate stage 10 restore authentication and failure handling
-        run: node --test test/restore-stage10.test.mjs
+        run: node --test test/restore-http-stage10.test.mjs
       - name: Check isolated environment backup restore tests
         run: node --test test/restore-env-stage10.test.mjs
       - name: Independently verify reviewed safe policy snapshot
@@ -84,8 +82,7 @@ jobs:
           host = "https://choi-bujang-secret-vault-six-zeta.vercel.app"
           checks = [
             ("identity", "/aleph.json", "GET", None),
-            ("restore_method", "/api/restore", "GET", None),
-            ("restore_unauthorized", "/api/restore", "POST", b"{}"),
+            ("restore_method", "/api/restore/notes/00000000-0000-4000-8000-000000000005", "GET", None),
             ("notes_unauthorized", "/api/notes", "GET", None),
           ]
           for name, path, method, payload in checks:
