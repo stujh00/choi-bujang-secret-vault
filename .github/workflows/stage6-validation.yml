@@ -36,6 +36,7 @@ on:
       - 'src/operations-room.mjs'
       - 'test/operations-stage12.test.mjs'
       - 'scripts/operations-check.mjs'
+      - 'scripts/bundle.mjs'
       - 'api/restore/notes/[id].js'
       - 'src/detect.mjs'
       - 'docs/DETECT_EVENTS.md'
