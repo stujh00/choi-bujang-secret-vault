@@ -9,7 +9,9 @@ const checksumUrl=new URL('../backups/step10/safe-policy.sha256',import.meta.url
 const policyUrl=new URL('../src/decider.mjs',import.meta.url);
 function sha(buffer){return createHash('sha256').update(buffer).digest('hex');}
 function verifiedSnapshot(){
- // SHA-256 signs canonical LF-terminated policy JSON, independent of Windows\r\n // Git checkout conversions. Any non-newline modification still fails.\n const bytes=Buffer.from(readFileSync(snapshotUrl,'utf8').replace(/\r\n/g,'\n'),'utf8');
+ // Normalize only CRLF into LF before digest verification.
+ // Non-newline modifications still invalidate the signed snapshot.
+ const bytes=Buffer.from(readFileSync(snapshotUrl,'utf8').replace(/\r\n/g,'\n'),'utf8');
  const expected=readFileSync(checksumUrl,'utf8').trim().split(/\s+/)[0];
  if(!/^[0-9a-f]{64}$/i.test(expected)||
     !timingSafeEqual(Buffer.from(sha(bytes),'hex'),Buffer.from(expected,'hex')))
