@@ -61,3 +61,17 @@ test('deleted B note is restored from verified backup with its original ID and o
  assert.equal(db.state.row.id,ID);assert.equal(db.state.row.owner_id,B);
  assert.equal(db.state.row.content,note.content);
 });
+
+test('post-restore read verification failure must not be declared successful',async()=>{
+ const db=fakeDb();
+ db.getOwned=async(_id,owner)=>({data:owner===B?null:db.state.row});
+ const response=res();
+ await restoreOneNote({
+  method:'POST',url:'/api/restore/notes/'+ID,
+  headers:{authorization:'Bearer fake.jwt.example'},body:{},
+ },response,{verifyUser:async()=>({userId:B}),db,env});
+ assert.equal(response.state.status,503);
+ assert.equal(response.state.payload.error,'POST_RESTORE_RETEST_FAILED');
+ assert.equal(response.state.payload.retests.ownRead.measured,false);
+ assert.equal(response.state.payload.retests.otherReadDenied.measured,false);
+});

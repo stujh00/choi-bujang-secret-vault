@@ -64,7 +64,9 @@ export async function restoreOneNote(req,res,{verifyUser,db,env=process.env}) {
     ownRead:{measured:!own.error&&!!own.data,status:own.data?200:own.error?503:404},
     otherReadDenied:{measured:!other.error&&!other.data,status:other.error?503:other.data?200:404},
   };
-  audit({id:backup.id,action:'retest',result:retests.ownRead.measured&&retests.otherReadDenied.measured?'passed':'failed'});
+  const retestPassed=retests.ownRead.measured&&retests.otherReadDenied.measured;
+  audit({id:backup.id,action:'retest',result:retestPassed?'passed':'failed'});
+  if(!retestPassed) return send(res,503,{error:'POST_RESTORE_RETEST_FAILED',retests});
   return send(res,200,{id:backup.id,restored:true,ownerVerified:true,
     contentSha256:backup.contentSha256,retests});
 }
