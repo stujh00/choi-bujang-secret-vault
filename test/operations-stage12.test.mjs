@@ -23,7 +23,8 @@ test('operations GET returns metadata; mutation is rejected',async()=>{
  const res={headers:{},setHeader(k,v){this.headers[k]=v;},status(code){this.code=code;return this;},json(body){this.body=body;return this;}};
  await handler({method:'POST'},res);assert.equal(res.code,405);
  await handler({method:'GET'},res);assert.equal(res.code,200);assert.equal(res.headers['Cache-Control'],'no-store');
- assert.equal(res.body.regression.length,19);
+ assert.equal(res.body.regression.length,21);
+ assert.equal(res.body.regression.filter(x=>x.scope==='live_api'&&x.status==='not_run').length,13);
 });
 
 
@@ -50,4 +51,28 @@ test('operation room renders server evidence only, without unrecorded browser pr
  assert.equal(source.split('fetch(').length - 1,1);
  assert.ok(source.includes('for(const row of data.regression)'));
  assert.ok(source.includes('서버 총공세 집계 불일치'));
+});
+
+test('operations records live GET statuses instead of claiming unexecuted checks passed',async()=>{
+ const calls=[];
+ const report=await operationsReport({liveProbe:true,fetchImpl:async(url,options)=>{
+  const path=new URL(String(url)).pathname;
+  calls.push({path,method:options.method,credentials:options.credentials,headers:options.headers});
+  return {status:path==='/api/notes'?401:200};
+ }});
+ const checked=report.regression.filter(x=>x.scope==='live_api'&&x.status==='measured');
+ assert.equal(checked.length,2);
+ assert.ok(checked.every(x=>x.passed&&x.requestId&&x.checkedAt));
+ assert.deepEqual(calls.map(x=>x.path),['/api/notes','/data.json']);
+ assert.ok(calls.every(x=>x.method==='GET'&&!x.credentials&&!x.headers));
+ assert.equal(report.assault.measured,0);
+ const failed=await operationsReport({liveProbe:true,fetchImpl:async(url)=>{
+  return {status:new URL(String(url)).pathname==='/api/notes'?200:200};
+ }});
+ const denied=failed.regression.find(x=>x.name==='anonymous_notes_live');
+ assert.equal(denied.status,'measured');
+ assert.equal(denied.passed,false);
+ assert.equal(denied.actual,'HTTP 200');
+ const unreachable=await operationsReport({liveProbe:true,fetchImpl:async()=>{throw new Error('offline');}});
+ assert.ok(unreachable.regression.filter(x=>x.scope==='live_api').slice(0,2).every(x=>x.status==='not_run'&&x.actual===null));
 });
