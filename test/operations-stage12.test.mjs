@@ -47,7 +47,7 @@ test('bundle self-check treats an unavailable judge network as not_run, never as
 test('operation room renders server evidence only, without unrecorded browser probes',async()=>{
  const {readFileSync}=await import('node:fs');
  const source=readFileSync(new URL('../public/operations.js',import.meta.url),'utf8');
- assert.equal((source.match(/\\bfetch\\(/g)||[]).length,1);
+ assert.equal(source.split('fetch(').length - 1,1);
  assert.ok(source.includes('for(const row of data.regression)'));
  assert.ok(source.includes('서버 총공세 집계 불일치'));
 });
