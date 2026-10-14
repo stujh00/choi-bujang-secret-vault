@@ -201,3 +201,7 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 - `npm run restore:plan`은 원본 해시 및 현재 판정기와 사본의 차이를 확인하고 변경 항목을 출력합니다. `npm run restore:apply -- --confirm=step9-reviewed`는 버전명을 명시한 경우에만 판정기 한 파일을 되돌리고 `artifacts/policy-restore-result.json`에 실행 메타데이터를 기록합니다. 실제 적용 명령은 아직 실행하지 않았습니다.
 - `GET /api/notes/audit`는 검증된 본인/심판 B만 자기 메모 복구 감사 기록을 조회합니다. **서버리스 인스턴스 메모리 감사 기록은 전역 영속 기록이 아니며** 운영 플랫폼의 append-only 로그 출력과 구분됩니다.
 - `GET /api/operations`는 미실행 항목을 `not_run`으로 정직하게 보고합니다. 심판이 실제 복구/정책 원복을 실행했다고 주장하지 않습니다.
+
+### 배포 함수 수 제한 보완
+
+- Vercel Hobby 배포의 Serverless Functions 최대 12개 제한을 준수하기 위해 10단계에서 추가한 중복 복구 함수 `api/restore.js`와 선택적 별칭 `api/notes/restore/[id].js`를 제거했습니다. 심판 필수 복구 경로 `POST /api/restore/notes/:id`, 감사 조회 `GET /api/notes/audit`, 운영 점검 `GET /api/operations`는 유지합니다. 이전 1~9단계 서버 API는 변경하지 않았습니다.

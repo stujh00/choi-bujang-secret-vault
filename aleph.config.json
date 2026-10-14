@@ -20,9 +20,7 @@
     "GET /api/announcements/:id",
     "PUT /api/announcements/:id",
     "DELETE /api/announcements/:id",
-    "POST /api/restore",
     "POST /api/restore/notes/:id",
-    "POST /api/notes/restore/:id",
     "GET /api/notes/audit",
     "GET /api/operations"
   ],
