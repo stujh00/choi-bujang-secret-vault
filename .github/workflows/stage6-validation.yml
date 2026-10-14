@@ -19,6 +19,11 @@ on:
       - 'test/restore-env-stage10.test.mjs'
       - 'src/restore-env.mjs'
       - 'src/restore-backup.mjs'
+      - 'backups/step10/safe-policy.json'
+      - 'backups/step10/safe-policy.sha256'
+      - 'scripts/restore-policy.mjs'
+      - 'api/notes/audit.js'
+      - 'api/operations.js'
       - 'api/restore/notes/[id].js'
       - 'api/notes/restore/[id].js'
       - 'src/restore-note.mjs'
@@ -66,6 +71,8 @@ jobs:
         run: node --test test/restore-stage10.test.mjs
       - name: Check isolated environment backup restore tests
         run: node --test test/restore-env-stage10.test.mjs
+      - name: Independently verify reviewed safe policy snapshot
+        run: npm run restore:plan
       - name: Build static files without deployment
         run: npm run build -- --local
       - name: Probe public deployment restore route without credentials

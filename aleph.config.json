@@ -22,7 +22,9 @@
     "DELETE /api/announcements/:id",
     "POST /api/restore",
     "POST /api/restore/notes/:id",
-    "POST /api/notes/restore/:id"
+    "POST /api/notes/restore/:id",
+    "GET /api/notes/audit",
+    "GET /api/operations"
   ],
   "originalApiUrl": "https://fkaqjesnvkqxrftaqmxe.supabase.co/rest/v1/vault_notes",
   "restoreRoute": "/api/restore/notes/:id"
