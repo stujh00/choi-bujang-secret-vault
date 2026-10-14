@@ -152,7 +152,7 @@ test('session refresh rotates the HttpOnly cookie and exposes only verified emai
   }, response.response);
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.body, { user: { email: userEmail } });
+  assert.deepEqual(response.body, { user: { email: userEmail }, device: { registered: false, status: 'unverified', source: 'server' } });
   assert.equal(refreshCount, 1);
   assert.match(response.headers.get('set-cookie'), /HttpOnly; Secure; SameSite=Lax/u);
   const updatedSession = readSessionCookie({ headers: { cookie: response.headers.get('set-cookie') } }, secretForTests);

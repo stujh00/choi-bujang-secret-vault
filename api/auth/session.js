@@ -9,7 +9,7 @@ function readConfig() {
 
 function anonymous(response) {
   clearSessionCookie(response);
-  return response.status(200).json({ user: null });
+  return response.status(200).json({ user: null, device: { registered: false, status: 'unverified', source: 'server' } });
 }
 
 export default async function handler(request, response) {
@@ -40,7 +40,7 @@ export default async function handler(request, response) {
     if (userError || !userData.user) return anonymous(response);
 
     writeSessionCookie(response, data.session, environment.secretKey);
-    return response.status(200).json({ user: { email: userData.user.email ?? null } });
+    return response.status(200).json({ user: { email: userData.user.email ?? null }, device: { registered: false, status: 'unverified', source: 'server' } });
   } catch {
     return response.status(502).json({ error: 'AUTH_PROVIDER_UNAVAILABLE' });
   }

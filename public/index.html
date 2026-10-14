@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BYTE BACK | 점령된 자료실</title>
+  <title>BYTE BACK | 나의 자료실</title>
+  <meta name="theme-color" content="#101a28">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/vault-192.png">
   <style>
     :root { color-scheme: dark; font-family: system-ui, sans-serif; }
     * { box-sizing: border-box; }
@@ -45,8 +48,17 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 5단계 인증 보호</div>
+    <div class="eyebrow">BYTE BACK · 나의 자료실</div>
     <h1>자료실</h1>
+
+    <section class="auth-panel" aria-labelledby="appHeading">
+      <h2 id="appHeading">나의 접속 앱</h2>
+      <p id="installStatus" class="status info">앱 실행 방식을 확인하고 있습니다.</p>
+      <p id="deviceStatus" class="status info" role="status">기기 확인 전 · 서버 응답을 기다리고 있습니다.</p>
+      <p>앱 설치만으로 기기가 승인되지는 않습니다. 보호 요청의 권한은 서버에서 확인합니다.</p>
+      <button id="installAppButton" class="secondary-button" type="button" hidden>자료실 앱 설치</button>
+      <p id="connectionStatus" class="status error" role="status" hidden>오프라인입니다. 인터넷에 다시 연결하면 로그인과 기기 상태를 확인합니다. 보호 자료는 오프라인으로 저장하지 않습니다.</p>
+    </section>
 
     <section class="auth-panel" aria-live="polite">
       <h2>Supabase Auth 로그인</h2>
@@ -91,6 +103,7 @@
     </section>
   </main>
   <script type="module">
+    import { showDeviceStatus } from "/pwa.js";
     const list = document.querySelector('#notes');
     const notePanel = document.querySelector('#notePanel');
     const noteForm = document.querySelector('#noteForm');
@@ -151,10 +164,12 @@
     }
 
     async function loadNotes() {
+      if (!navigator.onLine) { notePanel.hidden = true; list.replaceChildren(); return; }
       try {
         const response = await apiFetch('/api/notes');
         if (!response.ok) throw new Error('자료를 불러올 수 없습니다.');
         const data = await parseJsonResponse(response);
+        if (!navigator.onLine) { notePanel.hidden = true; list.replaceChildren(); return; }
         const notes = Array.isArray(data) ? data : (Array.isArray(data.notes) ? data.notes : []);
         if (notes.length === 0) {
           list.replaceChildren(document.createTextNode('작성된 메모가 없습니다.'));
@@ -213,10 +228,11 @@
     }
 
     function updateAuthUI(session) {
+      showDeviceStatus(session);
       const loggedIn = Boolean(session?.user);
       loginForm.hidden = loggedIn;
       logoutButton.hidden = !loggedIn;
-      notePanel.hidden = !loggedIn;
+      notePanel.hidden = !loggedIn || !navigator.onLine;
 
       if (loggedIn) {
         authStatus.textContent = `로그인됨: ${session.user.email}`;
