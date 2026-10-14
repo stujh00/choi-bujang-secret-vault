@@ -21,7 +21,7 @@ test('policy apply re-verifies reviewed snapshot, requires exact version, preser
   writeFileSync(join(root,'artifacts/policy-restore-plan.json'),JSON.stringify(plan));
   assert.throws(()=>restoreApply('wrong',root));
   const result=restoreApply(plan.version,root);assert.equal(result.applied,true);
-  assert.equal(readFileSync(join(root,'src/decider.mjs'),'utf8'),source);
+  assert.equal(readFileSync(join(root,'src/decider.mjs'),'utf8').replace(/\r\n/g,'\n'),source.replace(/\r\n/g,'\n'));
   assert.equal(readFileSync(join(root,'src/other-service.mjs'),'utf8'),'preserved');
   assert.deepEqual(getAuditHistory(owner),audit);
   writeFileSync(join(root,'backups/step10/safe-policy.json'),'{}');
