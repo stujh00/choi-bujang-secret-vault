@@ -3,10 +3,16 @@
 const PRIVATE_VALUE_PATTERN = /-----BEGIN [A-Z ]*PRIVATE KEY-----|\bsb_(?:secret|publishable)_[A-Za-z0-9_-]{8,}\b|\bSUPABASE_SECRET_KEY\s*[:=]\s*["'][^"']+["']|\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\beyJ[A-Za-z0-9_-]{12,}\.eyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{8,}/iu;
 
 async function fetchText(url, options = {}) {
-  const response = await fetch(url, {
-    redirect: 'error', signal: AbortSignal.timeout(10000), ...options,
-  });
-  return { response, text: await response.text() };
+  try {
+    const response = await fetch(url, {
+      redirect: 'error', signal: AbortSignal.timeout(10000), ...options,
+    });
+    return { response, text: await response.text(), failed: false };
+  } catch {
+    // Offline or sandboxed judge environments must not turn an unmade
+    // network probe into a passed check or abort the entire submission.
+    return { response: { ok: false, status: 'network_error' }, text: '', failed: true };
+  }
 }
 
 export async function runAttackChecks(config) {
@@ -130,7 +136,9 @@ export async function runAttackChecks(config) {
 
     const staticAuditPassed = response.ok && staticNoteCount === 0 && !staticHasSampleMarker
       && pageResponse.ok && identityResponse.ok && !staticHasPrivateValue;
-    const sourceReadObserved = sourceReadResponse.status === 401 || sourceReadResponse.status === 403
+    const sourceReadObserved = sourceReadResponse.status === 'network_error'
+      ? 'not_run: 원본 API 응답을 확인할 수 없어 거부 성공 여부를 판정하지 않음'
+      : sourceReadResponse.status === 401 || sourceReadResponse.status === 403
       ? `비인가 원본 API GET이 HTTP ${sourceReadResponse.status}로 거부됨${anonKey ? ' (anon 키 사용)' : ' (anon 키 미발견)'}`
       : sourceReadCount === undefined
         ? `비인가 원본 API GET 결과 HTTP ${sourceReadResponse.status}; 응답 자료는 기록하지 않음`
@@ -256,8 +264,11 @@ export async function runAttackChecks(config) {
     }
     if(config.step >= 12) {
       for(const [attackId,path,expectedStatus] of [['operations_live','/api/operations',200],['anonymous_notes_live','/api/notes',401]]) {
-        const {response}=await fetchText(new URL(path,app));
-        attempts.push({attackId,expected:`Live GET HTTP ${expectedStatus}`,observed:`measured: HTTP ${response.status}; expected ${expectedStatus}; response body excluded`});
+        const {response,failed}=await fetchText(new URL(path,app));
+        attempts.push({attackId,expected:`Live GET HTTP ${expectedStatus}`,
+          observed:failed
+            ? 'not_run: 네트워크 요청 실패로 실제 API 응답을 확인하지 못함'
+            : `measured: HTTP ${response.status}; expected ${expectedStatus}; response body excluded`});
       }
       attempts.push({attackId:'judge_assault_41',expected:'41 engine attacks independently judged',observed:'not_run: server fixtures and read-only probes are not the 41 judge attacks'});
     }
