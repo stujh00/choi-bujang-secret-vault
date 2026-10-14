@@ -3,7 +3,6 @@ import {createHash, timingSafeEqual} from 'node:crypto';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const projectRoot=new URL('../',import.meta.url);
 const snapshotUrl=new URL('../backups/step10/safe-policy.json',import.meta.url);
 const checksumUrl=new URL('../backups/step10/safe-policy.sha256',import.meta.url);
 const policyUrl=new URL('../src/decider.mjs',import.meta.url);
@@ -31,6 +30,10 @@ const plan={
  oldPolicySha256:sha(Buffer.from(actual)),
  safePolicySha256:sha(Buffer.from(policy.source)),
  changed:actual!==policy.source,
+ differences:actual.split('\n').flatMap((line,index)=>
+   line===policy.source.split('\n')[index]?[]:[{line:index+1,current:line,safe:policy.source.split('\n')[index]??null}])
+   .concat(policy.source.split('\n').slice(actual.split('\n').length).map((line,index)=>
+     ({line:actual.split('\n').length+index+1,current:null,safe:line}))),
  scope:['src/decider.mjs'],
  protected:['auditHistory','Supabase database','1~9단계 메모','인증키','보너스 XDR'],
 };

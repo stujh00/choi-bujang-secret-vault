@@ -247,24 +247,10 @@ export async function runAttackChecks(config) {
       // claim to revoke a real session or measure a real response time.
     }
     if (config.step === 10) {
-      const { TEST_B_NOTE_ID } = await import('./restore-note.mjs');
-      attempts.push({
-        attackId:'verified_b_backup_database',
-        expected:'B 시험 메모 원본 1건의 비공개 백업·해시·소유자 검증',
-        observed:'사전 Supabase SQL 확인: 백업 1건, 해시 일치, 원본과 일치; 실제 변조·삭제 복원 시험은 미실행',
-      });
-      attempts.push({
-        attackId:'restore_route_auth_local',
-        expected:'POST /api/restore는 심판 B JWT만 사용하며 다른 대상·일반 사용자 요청은 거부',
-        observed:config.restoreRoute === '/api/restore' && TEST_B_NOTE_ID.endsWith('0005')
-          ? '로컬 경로와 고정 대상 검사 준비; 운영 심판 호출은 미실행'
-          : '복구 경로 또는 대상 검사 실패',
-      });
-      attempts.push({
-        attackId:'post_restore_regression_unexecuted',
-        expected:'실제 복원 이후 1~9단계 정상·공격 요청 재시험',
-        observed:'미실행: 아직 심판의 변조·삭제 및 복원 호출이 없어 사후 운영 재시험 불가',
-      });
+      attempts.push({attackId:'step10_restore_contract',
+        expected:'Environment backup, empty body, verified owner, actual GET handler retests',
+        observed:'not_run: restore requires a private environment backup and authenticated owner; bundle uses read-only checks only'});
+
     }
     return attempts;
   }

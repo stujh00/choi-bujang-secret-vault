@@ -205,3 +205,29 @@ Vercel API는 서버 전용 Supabase Secret Key를 사용하며 이 권한은 RL
 ### 배포 함수 수 제한 보완
 
 - Vercel Hobby 배포의 Serverless Functions 최대 12개 제한을 준수하기 위해 10단계에서 추가한 중복 복구 함수 `api/restore.js`와 선택적 별칭 `api/notes/restore/[id].js`를 제거했습니다. 심판 필수 복구 경로 `POST /api/restore/notes/:id`, 감사 조회 `GET /api/notes/audit`, 운영 점검 `GET /api/operations`는 유지합니다. 이전 1~9단계 서버 API는 변경하지 않았습니다.
+
+### Step 10 environment restore contract correction
+
+`POST /api/restore/notes/:id` accepts an empty request with no JSON body.
+The verified token subject must equal the owner in the independently hashed
+`RESTORE_NOTE_BACKUP_JSON` snapshot. A judge role never substitutes the backup
+owner for the token subject. Missing or invalid snapshots return 503, a different
+snapshot ID returns 404, another owner returns 403, and supplied JSON returns 400.
+Only the requested verified note is inserted or updated; restore responses contain
+hashes and metadata, never its content.
+
+After restoring, two GET requests run through the shared public note-read handler:
+the verified owner and a fresh distinct server-generated principal. Metadata is in
+`restore.retests` (also `retests` for compatibility). This measures handler access
+control; it does not claim a network request with another user's token or a judge
+pass. Operations distinguishes measured executions from not_run. Audit entries
+are append-only and filtered by authenticated user; they are process-local and
+may be unavailable across separate serverless runtimes or cold starts.
+
+Run `npm test`, `npm run build -- --local`, and `npm run restore:plan`.
+Policy apply requires `npm run restore:apply -- --confirm=step9-reviewed`; it
+preserves audit history and writes its report only under ignored `artifacts/`.
+Commit source changes before `npm run bundle`; keep `bundle-notes.json` and
+`artifacts/submission.json` out of Git. Bundle checks send only read-only requests.
+Local validation: 55 tests passed, local build passed, policy hash verified.
+Live deployment and judge restoration were not tested in this correction.

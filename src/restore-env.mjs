@@ -1,8 +1,16 @@
+import { randomUUID } from 'node:crypto';
+import { readOwnedNote } from './note-read.mjs';
 import { readVerifiedBackup } from './restore-backup.mjs';
 
 function send(res, status, body) { return res.status(status).json(body); }
-export const auditHistory = [];
-export function getAuditHistory() { return auditHistory.map(({time,action,result,id})=>({time,action,result,id})); }
+const auditHistory = [];
+export function getAuditHistory(ownerId) {
+  return auditHistory.filter(entry=>entry.ownerId===ownerId)
+    .map(({time,action,result,id})=>({time,action,result,id}));
+}
+export function getRestoreOperations() {
+  return auditHistory.map(({time,action,result})=>({time,action,result}));
+}
 function audit(entry) {
   // Append-only process-local record plus platform durable stdout; never store
   // note content, source JSON, password, JWT or raw token.
@@ -22,9 +30,7 @@ export async function restoreOneNote(req,res,{verifyUser,db,env=process.env}) {
     ?? /^\/api\/notes\/restore\/([0-9a-f-]{36})\/?$/i.exec(raw);
   if(!m||!isUuid(m[1])) return send(res,404,{error:'RESOURCE_NOT_FOUND'});
   // Request body is never a source of restore identity, owner, role or content.
-  if(req.body!==undefined && req.body!==null
-      && ((typeof req.body==='string' && req.body.trim()!=='')
-        || (typeof req.body==='object' && Object.keys(req.body).length>0)))
+  if(req.body!==undefined && req.body!=='')
     return send(res,400,{error:'BODY_NOT_ALLOWED'});
   const authorization=req.headers?.authorization;
   const session=await verifyUser(authorization).catch(()=>null);
@@ -52,21 +58,30 @@ export async function restoreOneNote(req,res,{verifyUser,db,env=process.env}) {
     ?createHash('sha256').update(Buffer.from(check.data.content,'utf8')).digest('hex'):null;
   if(check.error||!check.data||check.data.owner_id!==backup.ownerId
       ||hash===null||!timingSafeEqual(Buffer.from(hash,'hex'),Buffer.from(backup.contentSha256,'hex'))) {
-    audit({id:backup.id,action:'restore',result:'postcheck_failed'});
+    audit({ownerId:session.userId,id:backup.id,action:'restore',result:'postcheck_failed'});
     return send(res,503,{error:'RESTORE_VERIFICATION_FAILED'});
   }
-  audit({id:backup.id,action:'restore',result:'verified'});
-  // API-level retests: execute both checks on the restored resource.
-  // Other-person access is enforced by the exact owner predicate on the data adapter.
-  const own=await db.getOwned(backup.id,session.userId);
-  const other=await db.getOwned(backup.id,'00000000-0000-4000-8000-000000000000');
-  const retests={
-    ownRead:{measured:!own.error&&!!own.data,status:own.data?200:own.error?503:404},
-    otherReadDenied:{measured:!other.error&&!other.data,status:other.error?503:other.data?200:404},
-  };
-  const retestPassed=retests.ownRead.measured&&retests.otherReadDenied.measured;
-  audit({id:backup.id,action:'retest',result:retestPassed?'passed':'failed'});
+  audit({ownerId:session.userId,id:backup.id,action:'restore',result:'verified'});
+  // Dispatch real GET requests through the same handler as /api/notes/:id.
+  // No body or token is retained in the evidence. A fresh foreign principal
+  // exercises the owner predicate without needing another user's credentials.
+  let foreignOwner;
+  do { foreignOwner=randomUUID(); } while(foreignOwner===backup.ownerId);
+  async function retest(userId, expected) {
+    let status=0;
+    const response={setHeader(){},status(code){status=code;return this;},json(){}};
+    try {
+      await readOwnedNote({method:'GET',url:'/api/notes/'+backup.id},response,
+        {login:{userId},db});
+      return {measured:true,method:'GET',path:'/api/notes/'+backup.id,status,
+        passed:status===expected};
+    } catch {return {measured:false,status:null,passed:false};}
+  }
+  const retests={ownRead:await retest(session.userId,200),
+    otherReadDenied:await retest(foreignOwner,404)};
+  const retestPassed=retests.ownRead.passed&&retests.otherReadDenied.passed;
+  audit({ownerId:session.userId,id:backup.id,action:'retest',result:retestPassed?'passed':'failed'});
   if(!retestPassed) return send(res,503,{error:'POST_RESTORE_RETEST_FAILED',retests});
   return send(res,200,{id:backup.id,restored:true,ownerVerified:true,
-    contentSha256:backup.contentSha256,retests});
+    contentSha256:backup.contentSha256,retests,restore:{retests}});
 }

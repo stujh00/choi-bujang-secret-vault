@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {createHash} from 'node:crypto';
 import {readVerifiedBackup} from '../src/restore-backup.mjs';
-import {restoreOneNote} from '../src/restore-env.mjs';
+import {getAuditHistory,restoreOneNote} from '../src/restore-env.mjs';
 const ID='00000000-0000-4000-8000-000000000005';
 const A='11111111-1111-4111-8111-111111111111';
 const B='22222222-2222-4222-8222-222222222222';
@@ -20,7 +20,7 @@ function fakeDb(initial={...note,content:'changed'}) {
  getOwned:async(_id,owner)=>({data:state.row?.owner_id===owner?state.row:null}),
  };
 }
-async function run({body={},user=B,backup=env,id=ID,db=fakeDb(),method='POST'}={}) {
+async function run({body=undefined,user=B,backup=env,id=ID,db=fakeDb(),method='POST'}={}) {
  const response=res();
  await restoreOneNote({method,url:'/api/restore/notes/'+id,
    headers:{authorization:'Bearer fake.jwt.example'},body},response,{
@@ -68,10 +68,31 @@ test('post-restore read verification failure must not be declared successful',as
  const response=res();
  await restoreOneNote({
   method:'POST',url:'/api/restore/notes/'+ID,
-  headers:{authorization:'Bearer fake.jwt.example'},body:{},
+  headers:{authorization:'Bearer fake.jwt.example'},body:undefined,
  },response,{verifyUser:async()=>({userId:B}),db,env});
  assert.equal(response.state.status,503);
  assert.equal(response.state.payload.error,'POST_RESTORE_RETEST_FAILED');
- assert.equal(response.state.payload.retests.ownRead.measured,false);
- assert.equal(response.state.payload.retests.otherReadDenied.measured,false);
+ assert.equal(response.state.payload.retests.ownRead.passed,false);
+ assert.equal(response.state.payload.retests.otherReadDenied.passed,true);
+});
+
+test('all supplied JSON bodies are rejected without writes', async()=>{
+ for(const body of [{},[],false,0,'{}','null']) {
+  const {response,db}=await run({body});
+  assert.equal(response.status,400);assert.equal(db.state.writes,0);
+ }
+});
+
+test('audit belongs to the verified owner and survives later restores',async()=>{
+ const before=getAuditHistory(B).length;
+ await run();await run();
+ assert.equal(getAuditHistory(B).length,before+4);
+ assert.equal(getAuditHistory(A).length,0);
+ assert.equal(JSON.stringify(getAuditHistory(B)).includes(note.content),false);
+});
+test('retest evidence records dispatched GET status in restore.retests',async()=>{
+ const {response}=await run();
+ assert.equal(response.payload.restore.retests.ownRead.method,'GET');
+ assert.equal(response.payload.restore.retests.ownRead.status,200);
+ assert.equal(response.payload.restore.retests.otherReadDenied.status,404);
 });

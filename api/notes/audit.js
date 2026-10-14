@@ -1,6 +1,6 @@
+import {readSessionCookie} from '../../src/auth-session.mjs';
 import fs from 'node:fs';
 import {createLoginVerifier} from '../../src/verify-login.mjs';
-import {readVerifiedBackup} from '../../src/restore-backup.mjs';
 import {getAuditHistory} from '../../src/restore-env.mjs';
 
 export default async function handler(request,response) {
@@ -13,16 +13,14 @@ export default async function handler(request,response) {
  let config;
  try{config=JSON.parse(fs.readFileSync(new URL('../../aleph.config.json',import.meta.url),'utf8'));}
  catch{return response.status(503).json({error:'SERVICE_UNAVAILABLE'});}
+ let authorization=request.headers?.authorization;
+ if(!authorization){
+  const cookie=readSessionCookie(request,secretKey);
+  if(cookie) authorization='Bearer '+cookie.access_token;
+ }
  let session;
- try{session=await createLoginVerifier({config,supabaseSecretKey:secretKey})(request.headers?.authorization);}
+ try{session=await createLoginVerifier({config,supabaseSecretKey:secretKey})(authorization);}
  catch{session=null;}
  if(!session) return response.status(401).json({error:'AUTH_REQUIRED'});
- const verified=readVerifiedBackup();
- if(!verified.ok) return response.status(503).json({error:'BACKUP_UNAVAILABLE'});
- const owner=verified.backup.ownerId;
- if(!(session.kind==='judge'&&session.identity==='b') &&
-   !(session.kind==='student'&&session.userId===owner))
-   return response.status(403).json({error:'AUDIT_FORBIDDEN'});
- // This log is process-local; production platform stdout also stores events.
- return response.status(200).json({entries:getAuditHistory().filter(x=>x.id===verified.backup.id),scope:'current_runtime'});
+ return response.status(200).json({entries:getAuditHistory(session.userId),scope:'current_runtime'});
 }

@@ -1,7 +1,7 @@
+import {readSessionCookie,requestOriginAllowed} from '../../../src/auth-session.mjs';
 import fs from 'node:fs';
 import {createClient} from '@supabase/supabase-js';
 import {createLoginVerifier} from '../../../src/verify-login.mjs';
-import {readVerifiedBackup} from '../../../src/restore-backup.mjs';
 import {restoreOneNote} from '../../../src/restore-env.mjs';
 
 export default async function handler(request,response) {
@@ -21,12 +21,13 @@ export default async function handler(request,response) {
   };
   return restoreOneNote(request,response,{
     verifyUser:async authorization=>{
-      const login=await verify(authorization);
-      if(login?.kind==='student') return {userId:login.userId};
-      if(login?.kind==='judge'&&login.identity==='b'){
-        const proof=readVerifiedBackup();
-        if(proof.ok) return {userId:proof.backup.ownerId};
+      if(!authorization) {
+        const session=readSessionCookie(request,key);
+        if(session && !requestOriginAllowed(request)) return null;
+        if(session) authorization='Bearer '+session.access_token;
       }
+      const login=await verify(authorization);
+      if(login?.userId) return {userId:login.userId};
       return null;
     },
     db,

@@ -1,3 +1,4 @@
+import { readOwnedNote } from '../../src/note-read.mjs';
 import fs from 'node:fs';
 import { exactRoute, validNotePayload } from '../../src/resource-zones.mjs';
 import { readSessionCookie, requestOriginAllowed } from '../../src/auth-session.mjs';
@@ -55,20 +56,10 @@ export default async function handler(request, response) {
   }
 
   if (request.method === 'GET') {
-    const { data, error } = await supabase
-      .from('vault_notes')
-      .select('id,title,content,owner_id')
-      .eq('id', noteId)
-      .eq('owner_id', login.userId)
-      .maybeSingle();
-
-    if (error) {
-      return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
-    }
-    if (!data || data.owner_id !== login.userId) {
-      return response.status(404).json({ error: 'NOTE_NOT_FOUND' });
-    }
-    return response.status(200).json({ id: data.id, title: data.title, body: data.content });
+    return readOwnedNote(request, response, {login, db:{
+      getOwned: async(id,owner) => supabase.from('vault_notes')
+        .select('id,title,content,owner_id').eq('id',id).eq('owner_id',owner).maybeSingle(),
+    }});
   }
 
   if (request.method === 'PUT') {
